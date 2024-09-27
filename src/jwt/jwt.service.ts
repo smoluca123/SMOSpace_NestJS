@@ -33,6 +33,7 @@ export class JwtServiceCustom {
       handleDefaultError(error);
     }
   }
+
   async generateJwt(payload: any, options?: JwtSignOptions): Promise<string> {
     try {
       return await this.jwt.signAsync(payload, options);

@@ -18,6 +18,7 @@ import { Response } from 'express';
 import { Cookies } from 'src/decorators/cookies.decorator';
 import { UserAgent } from 'src/decorators/utils.decorator';
 import { IpAddress } from 'src/decorators/ip.decorator';
+import { CookieName } from 'src/global/enums.global';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
@@ -63,14 +64,18 @@ export class AuthController {
   @Get('/logout')
   @decoratorsAuthLogout()
   getInfomation(
-    @Cookies('accessToken') accessToken: string,
+    @Cookies(CookieName.ACCESS_TOKEN) accessToken: string,
+    @Cookies(CookieName.SESSION_ID) sessionId: number,
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
     @UserAgent() userAgent: string,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<IResponseType> {
     return this.authService.authLogout(
+      sessionId,
       decodedAccessToken,
       accessToken,
       userAgent,
+      response,
     );
   }
 }

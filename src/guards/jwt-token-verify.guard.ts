@@ -46,11 +46,17 @@ export class JwtTokenVerifyGuard implements CanActivate {
       throw new UnauthorizedException('Invalid access token');
     }
 
-    return this.validateTokenKeyMatch(decodedAccessToken);
+    return this.validateTokenKeyMatch(
+      decodedAccessToken,
+      accessToken,
+      request.headers['user-agent'],
+    );
   }
 
   private async validateTokenKeyMatch(
-    decodedAccessToken: any,
+    decodedAccessToken: IDecodedAccecssTokenType,
+    accessToken: string,
+    userAgent: string,
   ): Promise<boolean> {
     if (!decodedAccessToken.userId || !decodedAccessToken.username)
       throw new UnauthorizedException(
@@ -63,6 +69,22 @@ export class JwtTokenVerifyGuard implements CanActivate {
         username: decodedAccessToken.username,
       },
     });
+
+    const userSession = await this.prismaService.user_sessions.findFirst({
+      where: {
+        AND: [
+          {
+            user_id: decodedAccessToken.userId,
+            token: accessToken,
+            user_agent: userAgent,
+          },
+        ],
+      },
+    });
+
+    if (!userSession) {
+      throw new UnauthorizedException('Invalid login session');
+    }
 
     if (!user || !user.refresh_token) {
       throw new UnauthorizedException('User not found or has been deleted');

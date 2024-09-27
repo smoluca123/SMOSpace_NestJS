@@ -18,7 +18,9 @@ import { ConfigService } from '@nestjs/config';
 import { UserRegisterDto } from 'src/resources/auth/dto/UserRegister.dto';
 import { JwtServiceCustom } from 'src/jwt/jwt.service';
 import { JwtService } from '@nestjs/jwt';
+import { user_sessions } from '@prisma/client';
 import { Response } from 'express';
+import { CookieName } from 'src/global/enums.global';
 // import { Response } from 'express';
 
 @Injectable()
@@ -79,8 +81,13 @@ export class AuthService {
       const { refresh_token, type, password: _pw, ...resultUser } = checkUser;
 
       // Set the session
-      response.cookie('accessToken', accessToken);
-      await this.setAuthSession({ accessToken, userAgent, ipAddress });
+      const sessionResult = await this.setAuthSession({
+        accessToken,
+        userAgent,
+        ipAddress,
+      });
+      response.cookie(CookieName.ACCESS_TOKEN, accessToken);
+      response.cookie(CookieName.SESSION_ID, sessionResult.data.id);
 
       return {
         message: 'Logged in successfully',
@@ -162,8 +169,13 @@ export class AuthService {
       /*   eslint-enable @typescript-eslint/no-unused-vars*/
 
       // Set the session
-      res.cookie('accessToken', accessToken);
-      await this.setAuthSession({ accessToken, userAgent, ipAddress });
+      const sessionResult = await this.setAuthSession({
+        accessToken,
+        userAgent,
+        ipAddress,
+      });
+      res.cookie(CookieName.ACCESS_TOKEN, accessToken);
+      res.cookie(CookieName.SESSION_ID, sessionResult.data.id);
 
       return {
         message: 'User registered successfully',
@@ -177,9 +189,11 @@ export class AuthService {
   }
 
   async authLogout(
+    sessionId: number,
     decodedAccessToken: IDecodedAccecssTokenType,
     accessToken: string,
     userAgent: string,
+    response: Response,
   ): Promise<IResponseType> {
     try {
       const { userId } = decodedAccessToken;
@@ -189,13 +203,19 @@ export class AuthService {
         data: { refresh_token: null },
       });
 
-      await this.prisma.user_sessions.delete({
-        where: {
-          user_id: userId,
-          token: accessToken,
-          user_agent: userAgent,
-        },
-      });
+      // await this.prisma.user_sessions.delete({
+      //   where: {
+      //     id: sessionId,
+      //     user_id: userId,
+      //     token: accessToken,
+      //     user_agent: userAgent,
+      //   },
+      // });
+
+      // Delete session
+      await this.removeAuthSession(sessionId);
+      response.clearCookie(CookieName.ACCESS_TOKEN);
+      response.clearCookie(CookieName.SESSION_ID);
 
       return {
         message: 'Logged out successfully',
@@ -219,7 +239,7 @@ export class AuthService {
     userAgent: string;
     ipAddress: string;
     payload?: JSON;
-  }): Promise<IResponseType> {
+  }): Promise<IResponseType<user_sessions>> {
     try {
       const { exp, userId } = this.jwt.verify(
         accessToken,
@@ -237,8 +257,10 @@ export class AuthService {
         include: { user: true },
       });
 
+      let sessionResult: user_sessions = null;
+
       if (!checkUserSession) {
-        await this.prisma.user_sessions.create({
+        sessionResult = await this.prisma.user_sessions.create({
           data: {
             ip_address: ipAddress,
             token: accessToken,
@@ -250,12 +272,40 @@ export class AuthService {
             payload: JSON.stringify(payload),
           },
         });
+      } else {
+        sessionResult = await this.prisma.user_sessions.update({
+          where: { id: checkUserSession.id },
+          data: {
+            last_activity: currentDate,
+            token: accessToken,
+            payload: JSON.stringify(payload),
+          },
+        });
       }
 
       return {
         message: 'Set session successfully',
-        data: null,
+        data: {
+          ...sessionResult,
+        },
         statusCode: 201,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async removeAuthSession(sessionId: number): Promise<IResponseType> {
+    try {
+      await this.prisma.user_sessions.delete({
+        where: { id: sessionId },
+      });
+
+      return {
+        message: 'Removed session successfully',
+        data: null,
+        statusCode: 204,
         date: new Date(),
       };
     } catch (error) {
