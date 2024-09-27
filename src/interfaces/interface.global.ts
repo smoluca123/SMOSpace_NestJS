@@ -1,3 +1,5 @@
+import { Request } from 'express';
+
 export interface IResponseType<ResultDataType = any> {
   message: string;
   data: ResultDataType;
@@ -6,7 +8,7 @@ export interface IResponseType<ResultDataType = any> {
 }
 
 export interface IDecodedAccecssTokenType {
-  id: string;
+  userId: string;
   username: string;
   key: string | number;
   iat?: string | number;
