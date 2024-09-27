@@ -1,17 +1,15 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 import { IInfoApiType } from 'src/interfaces/interface.global';
-import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { Cookies } from 'src/decorators/cookies.decorator';
 
-@ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
-  getInfoApi(): IInfoApiType {
+  getInfoApi(@Cookies('accessToken') accessTokenCookie: string): IInfoApiType {
+    console.log(accessTokenCookie);
     return this.appService.getInfoApi();
   }
 }

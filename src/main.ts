@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import * as cookieParser from 'cookie-parser';
 import configuration from 'src/configs/configuration';
 
 const config = configuration();
@@ -18,8 +19,21 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, configDocument);
   SwaggerModule.setup('/swagger', app, document);
+
+  // Use Global Pipes to validate incoming requests
   app.useGlobalPipes(new ValidationPipe());
+
+  // Enable Cors (Cross-Origin Resource Sharing) middleware
   app.enableCors();
-  await app.listen(config.SERVER_PORT);
+
+  // Use Cookie Parser middleware
+  app.use(cookieParser());
+
+  await app.listen(config.SERVER_PORT, () => {
+    console.log(`Server is running on http://localhost:${config.SERVER_PORT}`);
+    console.log(
+      `Swagger API documentation is available at http://localhost:${config.SERVER_PORT}/swagger`,
+    );
+  });
 }
 bootstrap();
