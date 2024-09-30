@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
@@ -77,5 +85,10 @@ export class AuthController {
       userAgent,
       response,
     );
+  }
+
+  @Get('lyric/:trackId')
+  getLyric(@Param('trackId') trackId: string): Promise<IResponseType> {
+    return this.authService.getLyric(trackId);
   }
 }
