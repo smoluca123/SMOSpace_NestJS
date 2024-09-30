@@ -1683,7 +1683,7 @@ asynckit@^0.4.0:
   resolved "https://registry.yarnpkg.com/asynckit/-/asynckit-0.4.0.tgz#c79ed97f7f34cb8f2ba1bc9790bcc366474b4b79"
   integrity sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==
 
-axios@^1.7.7:
+axios@^1.4.0, axios@^1.7.7:
   version "1.7.7"
   resolved "https://registry.yarnpkg.com/axios/-/axios-1.7.7.tgz#2f554296f9892a72ac8d8e4c5b79c14a91d0a47f"
   integrity sha512-S4kL7XrjgBmvdGut0sN3yJxqYzrDOnivkBiN0OFs6hLiUam3UPvswUo0kqGyhqUZGEOytHyumEdXsAkgCOUf3Q==
@@ -5108,6 +5108,13 @@ symbol-observable@4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/symbol-observable/-/symbol-observable-4.0.0.tgz#5b425f192279e87f2f9b937ac8540d1984b39205"
   integrity sha512-b19dMThMV4HVFynSAM1++gBHAbk2Tc/osgLIBZMKsyqh34jb2e8Os7T6ZW/Bt3pJFdBTd2JwAnAAEQV7rSNvcQ==
+
+sync-lyrics@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/sync-lyrics/-/sync-lyrics-1.0.5.tgz#662e0638a080d52c366572a78a3c1f73cd7762d1"
+  integrity sha512-4tY9lJ3+8f8k+f5p1EWiRoHqCga1bcwvn6P4CLww9wVpRKoiXe/4K6ZCLPY9+1HSPy64WCpCBstXKB9ALr4hXA==
+  dependencies:
+    axios "^1.4.0"
 
 synckit@^0.9.1:
   version "0.9.1"

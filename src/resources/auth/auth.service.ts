@@ -318,7 +318,7 @@ export class AuthService {
 
   async getLyric(trackId: string): Promise<IResponseType> {
     try {
-      console.log(trackId);
+      // const spotClient = new LyricsClient(this.config.get('SPOTIFY_COOKIE'));
       const { accessToken } = await fetch(
         'https://open.spotify.com/get_access_token',
         {
@@ -338,21 +338,11 @@ export class AuthService {
             headers: {
               Authorization: `Bearer ${accessToken}`,
               'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0',
             },
           },
         ),
       );
-
-      // const { data } = await axios({
-      //   method: 'GET',
-      //   url: `https://spclient.wg.spotify.com/color-lyrics/v2/track/${trackId}?format=json&vocalRemoval=false&market=from_token`,
-      //   headers: {
-      //     Authorization: `Bearer ${accessToken}`,
-      //     'User-Agent':
-      //       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0',
-      //   },
-      // });
       console.log(data);
       return {
         data: null,
