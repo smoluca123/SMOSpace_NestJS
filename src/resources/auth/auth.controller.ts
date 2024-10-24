@@ -1,7 +1,6 @@
-import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import {
   IDecodedAccecssTokenType,
   IResponseType,
@@ -19,10 +18,11 @@ import { Cookies } from 'src/decorators/cookies.decorator';
 import { UserAgent } from 'src/decorators/utils.decorator';
 import { IpAddress } from 'src/decorators/ip.decorator';
 import { CookieName } from 'src/global/enums.global';
+// import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+// @UseGuards(AuthGuard('jwt'))
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -78,4 +78,9 @@ export class AuthController {
       response,
     );
   }
+
+  // @Get('lyric/:trackId')
+  // getLyric(@Param('trackId') trackId: string): Promise<IResponseType> {
+  //   return this.authService.getLyric(trackId);
+  // }
 }

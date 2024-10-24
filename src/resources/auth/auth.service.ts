@@ -21,6 +21,7 @@ import { JwtService } from '@nestjs/jwt';
 import { user_sessions } from '@prisma/client';
 import { Response } from 'express';
 import { CookieName } from 'src/global/enums.global';
+import { HttpService } from '@nestjs/axios';
 // import { Response } from 'express';
 
 @Injectable()
@@ -30,6 +31,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly jwtCustom: JwtServiceCustom,
     private readonly jwt: JwtService,
+    private readonly httpService: HttpService,
   ) {}
   async authLogin(
     credentials: UserLoginDto,
@@ -116,7 +118,6 @@ export class AuthService {
         password,
         phone_number,
       } = credentials;
-
       const checkUser = await this.prisma.user.findFirst({
         where: { username },
       });
@@ -129,14 +130,14 @@ export class AuthService {
       const userId = uuidv4();
       const key = uuidv4();
       const accessToken = await this.jwtCustom.generateAccessToken({
-        userId: checkUser.id,
-        username: checkUser.username,
+        userId,
+        username,
         key,
       });
       const refreshToken = await this.jwtCustom.generateAccessToken(
         {
-          userId: checkUser.id,
-          username: checkUser.username,
+          userId,
+          username,
           key,
         },
         { isRefreshToken: true },
@@ -245,7 +246,6 @@ export class AuthService {
         accessToken,
       ) as IDecodedAccecssTokenType;
       const currentDate = new Date();
-
       const checkUserSession = await this.prisma.user_sessions.findFirst({
         where: {
           AND: {
@@ -312,4 +312,41 @@ export class AuthService {
       handleDefaultError(error);
     }
   }
+
+  // async getLyric(trackId: string): Promise<IResponseType> {
+  //   try {
+  //     // const spotClient = new LyricsClient(this.config.get('SPOTIFY_COOKIE'));
+  //     const { accessToken } = await fetch(
+  //       'https://open.spotify.com/get_access_token',
+  //       {
+  //         headers: {
+  //           Cookie: this.config.get('SPOTIFY_COOKIE'),
+  //           'User-Agent':
+  //             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
+  //         },
+  //       },
+  //     ).then((res) => res.json());
+
+  //     const data = await fetch(
+  //       `https://spclient.wg.spotify.com/color-lyrics/v2/track/${trackId}?format=json&vocalRemoval=false&market=from_token`,
+  //       {
+  //         headers: {
+  //           'app-platform': 'WebPlayer',
+  //           Authorization: `Bearer ${accessToken}`,
+  //           'User-Agent':
+  //             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0',
+  //         },
+  //       },
+  //     ).then((res) => res.text());
+
+  //     return {
+  //       data: JSON.parse(data),
+  //       message: 'Get lyric successfully',
+  //       statusCode: 200,
+  //       date: new Date(),
+  //     };
+  //   } catch (error) {
+  //     handleDefaultError(error);
+  //   }
+  // }
 }
