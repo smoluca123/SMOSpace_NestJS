@@ -6,11 +6,11 @@ export class AppService {
   constructor() {}
   getInfoApi(): IInfoApiType {
     return {
-      name: 'Ecommerce API',
+      name: 'Discord API',
       version: '1.0.0',
       author: 'Luca Dev',
       swagger: '/swagger',
-      description: 'New Ecommerce API',
+      description: 'New Discord API',
     };
   }
 }
