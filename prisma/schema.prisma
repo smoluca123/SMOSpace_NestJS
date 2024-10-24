@@ -22,7 +22,7 @@ model user {
   phone_number  String?         @db.VarChar(11)
   age           Int?            @db.SmallInt
   type          String?         @default("1") @db.VarChar(255)
-  refresh_token String?         @db.VarChar(255)
+  refresh_token String?         @db.Text
   display_name  String?         @db.VarChar(255)
   created_at    DateTime?       @db.DateTime(0)
   updated_at    DateTime?       @db.DateTime(0)
@@ -44,7 +44,7 @@ model user_type {
 model user_sessions {
   id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
   user_id       String   @db.VarChar(255)
-  token         String   @unique(map: "token") @db.VarChar(255)
+  token         String   @db.Text
   ip_address    String   @db.VarChar(45)
   user_agent    String?  @db.Text
   payload       String?  @db.Text

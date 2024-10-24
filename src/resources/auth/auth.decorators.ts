@@ -1,5 +1,5 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { ApiOperation } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation } from '@nestjs/swagger';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 
 export const decoratorsAuthLogin = () =>
@@ -24,5 +24,8 @@ export const decoratorsAuthLogout = () =>
       summary: 'User Logout API',
       description: 'User Logout API, clear cookies',
     }),
-    // ApiHeader({ name: 'accessToken', required: !!requireAccessToken }),
+    ApiHeader({
+      name: 'accessToken',
+      required: process.env.COOKIE_MODE.toLowerCase() === 'TRUE',
+    }),
   );
