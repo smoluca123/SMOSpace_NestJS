@@ -1,5 +1,5 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation } from '@nestjs/swagger';
+import { ApiOperation } from '@nestjs/swagger';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 
 export const decoratorsAuthLogin = () =>
@@ -17,6 +17,20 @@ export const decoratorsAuthRegister = () =>
       description: 'User Registration API',
     }),
   );
+
+export const decoratorsValidateSession = () =>
+  applyDecorators(
+    UseGuards(JwtTokenVerifyGuard),
+    ApiOperation({
+      summary: 'Validate Session API',
+      description: 'Validate Session API',
+    }),
+    // ApiHeader({
+    //   name: 'accessToken',
+    //   required: process.env.COOKIE_MODE.toLowerCase() === 'false',
+    // }),
+  );
+
 export const decoratorsAuthLogout = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),
@@ -24,8 +38,8 @@ export const decoratorsAuthLogout = () =>
       summary: 'User Logout API',
       description: 'User Logout API, clear cookies',
     }),
-    ApiHeader({
-      name: 'accessToken',
-      required: process.env.COOKIE_MODE.toLowerCase() === 'TRUE',
-    }),
+    // ApiHeader({
+    //   name: 'accessToken',
+    //   required: process.env.COOKIE_MODE.toLowerCase() === 'false',
+    // }),
   );

@@ -18,10 +18,12 @@ import { ConfigService } from '@nestjs/config';
 import { UserRegisterDto } from 'src/resources/auth/dto/UserRegister.dto';
 import { JwtServiceCustom } from 'src/jwt/jwt.service';
 import { JwtService } from '@nestjs/jwt';
-import { user_sessions } from '@prisma/client';
 import { Response } from 'express';
 import { CookieName } from 'src/global/enums.global';
 import { HttpService } from '@nestjs/axios';
+import { userDataSelect, userTypeDataSelect } from 'src/libs/prisma-types';
+import { UserSession } from '@prisma/client';
+import { fromUnixTime } from 'date-fns';
 // import { Response } from 'express';
 
 @Injectable()
@@ -44,7 +46,7 @@ export class AuthService {
 
       const checkUser = await this.prisma.user.findFirst({
         where: { OR: [{ username }, { email: username }] },
-        include: { user_type: true },
+        include: { userType: true },
       });
 
       if (!checkUser) throw new NotFoundException('User not found');
@@ -75,12 +77,18 @@ export class AuthService {
       await this.prisma.user.update({
         where: { id: checkUser.id },
         data: {
-          refresh_token: refreshToken,
+          refreshToken: refreshToken,
         },
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { refresh_token, type, password: _pw, ...resultUser } = checkUser;
+      /* eslint-disable @typescript-eslint/no-unused-vars*/
+      const {
+        refreshToken: _rfToken,
+        type,
+        password: _pw,
+        ...resultUser
+      } = checkUser;
+      /* eslint-enable @typescript-eslint/no-unused-vars*/
 
       // Set the session
       const sessionResult = await this.setAuthSession({
@@ -113,10 +121,10 @@ export class AuthService {
         username,
         email,
         age,
-        display_name,
-        full_name,
+        displayName,
+        fullName,
         password,
-        phone_number,
+        phoneNumber,
       } = credentials;
       const checkUser = await this.prisma.user.findFirst({
         where: { username },
@@ -146,7 +154,7 @@ export class AuthService {
       /*   eslint-disable @typescript-eslint/no-unused-vars */
       const {
         password: _pw,
-        refresh_token,
+        refreshToken: _rfToken,
         type,
         ...resultUser
       } = await this.prisma.user.create({
@@ -155,16 +163,23 @@ export class AuthService {
           username,
           email,
           age,
-          display_name,
-          full_name,
+          displayName,
+          fullName,
           password: await bcrypt.hash(password, 10),
-          phone_number,
-          refresh_token: refreshToken,
-          is_active: 0,
-          created_at: new Date(),
+          phoneNumber,
+          refreshToken,
+          isActive: false,
+          createdAt: new Date(),
+          userType: {
+            connect: {
+              id: '588b1a65-426a-468c-9365-dc1c9b851a79',
+            },
+          },
         },
         include: {
-          user_type: true,
+          userType: {
+            select: userTypeDataSelect,
+          },
         },
       });
       /*   eslint-enable @typescript-eslint/no-unused-vars*/
@@ -190,10 +205,8 @@ export class AuthService {
   }
 
   async authLogout(
-    sessionId: number,
+    sessionId: string,
     decodedAccessToken: IDecodedAccecssTokenType,
-    accessToken: string,
-    userAgent: string,
     response: Response,
   ): Promise<IResponseType> {
     try {
@@ -201,7 +214,7 @@ export class AuthService {
 
       await this.prisma.user.update({
         where: { id: userId },
-        data: { refresh_token: null },
+        data: { refreshToken: null },
       });
 
       // await this.prisma.user_sessions.delete({
@@ -229,6 +242,33 @@ export class AuthService {
     }
   }
 
+  async authValidateSession(
+    sessionId: string,
+    decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    try {
+      const sessionResult = await this.prisma.userSession.findUnique({
+        where: { id: sessionId },
+        include: { user: { select: userDataSelect } },
+      });
+
+      if (!sessionResult || sessionResult.userId !== decodedAccessToken.userId)
+        throw new UnauthorizedException('Invalid session or expired session');
+
+      return {
+        message: 'Session is available',
+        data: {
+          ...sessionResult.user,
+          accessToken: decodedAccessToken.originalToken,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   //   ----------------- Utils
   async setAuthSession({
     accessToken,
@@ -240,53 +280,80 @@ export class AuthService {
     userAgent: string;
     ipAddress: string;
     payload?: JSON;
-  }): Promise<IResponseType<user_sessions>> {
+  }): Promise<IResponseType<UserSession>> {
     try {
       const { exp, userId } = this.jwt.verify(
         accessToken,
       ) as IDecodedAccecssTokenType;
       const currentDate = new Date();
-      const checkUserSession = await this.prisma.user_sessions.findFirst({
+      const expiresAt = fromUnixTime(+exp);
+
+      const checkUserSession = await this.prisma.userSession.findFirst({
         where: {
           AND: {
-            user_id: userId,
-            user_agent: userAgent,
-            ip_address: ipAddress,
+            userId: userId,
+            userAgent: userAgent,
+            ipAddress: ipAddress,
           },
         },
         include: { user: true },
       });
 
-      let sessionResult: user_sessions = null;
+      const userSession = await this.prisma.userSession.upsert({
+        where: {
+          id: checkUserSession?.id || '',
+        },
+        create: {
+          ipAddress: ipAddress,
+          token: accessToken,
+          createdAt: currentDate,
+          expiresAt,
+          lastActivity: currentDate,
+          userId: userId,
+          userAgent: userAgent,
+          payload: JSON.stringify(payload),
+        },
+        update: {
+          lastActivity: currentDate,
+          expiresAt,
+          token: accessToken,
+          payload: JSON.stringify(payload),
+        },
+        include: {
+          user: {
+            select: userDataSelect,
+          },
+        },
+      });
 
-      if (!checkUserSession) {
-        sessionResult = await this.prisma.user_sessions.create({
-          data: {
-            ip_address: ipAddress,
-            token: accessToken,
-            created_at: currentDate,
-            expires_at: new Date(exp),
-            last_activity: currentDate,
-            user_id: userId,
-            user_agent: userAgent,
-            payload: JSON.stringify(payload),
-          },
-        });
-      } else {
-        sessionResult = await this.prisma.user_sessions.update({
-          where: { id: checkUserSession.id },
-          data: {
-            last_activity: currentDate,
-            token: accessToken,
-            payload: JSON.stringify(payload),
-          },
-        });
-      }
+      // if (!checkUserSession) {
+      //   sessionResult = await this.prisma.userSession.create({
+      //     data: {
+      //       ipAddress: ipAddress,
+      //       token: accessToken,
+      //       createdAt: currentDate,
+      //       expiresAt: new Date(exp),
+      //       lastActivity: currentDate,
+      //       userId: userId,
+      //       userAgent: userAgent,
+      //       payload: JSON.stringify(payload),
+      //     },
+      //   });
+      // } else {
+      //   sessionResult = await this.prisma.userSession.update({
+      //     where: { id: checkUserSession.id },
+      //     data: {
+      //       lastActivity: currentDate,
+      //       token: accessToken,
+      //       payload: JSON.stringify(payload),
+      //     },
+      //   });
+      // }
 
       return {
         message: 'Set session successfully',
         data: {
-          ...sessionResult,
+          ...userSession,
         },
         statusCode: 201,
         date: new Date(),
@@ -296,9 +363,9 @@ export class AuthService {
     }
   }
 
-  async removeAuthSession(sessionId: number): Promise<IResponseType> {
+  async removeAuthSession(sessionId: string): Promise<IResponseType> {
     try {
-      await this.prisma.user_sessions.delete({
+      await this.prisma.userSession.delete({
         where: { id: sessionId },
       });
 

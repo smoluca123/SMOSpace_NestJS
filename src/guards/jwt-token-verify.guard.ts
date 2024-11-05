@@ -10,6 +10,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { Request as RequestExpress } from 'express';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interface.global';
+import { CookieName } from 'src/global/enums.global';
 
 @Injectable()
 export class JwtTokenVerifyGuard implements CanActivate {
@@ -25,14 +26,14 @@ export class JwtTokenVerifyGuard implements CanActivate {
       decodedAccessToken?: IDecodedAccecssTokenType;
     }
     const request = context.switchToHttp().getRequest() as RequestNewType;
-    if (!request.cookies['accessToken']) {
-      throw new UnauthorizedException('Access token is missing');
-    }
-    let accessToken = request.cookies['accessToken'];
 
-    if (accessToken.includes('Bearer')) {
-      accessToken = accessToken.split('Bearer ')[1];
-    }
+    const sessionId: string = request.cookies[CookieName.SESSION_ID];
+    if (!sessionId) throw new UnauthorizedException('Session ID is missing');
+
+    let accessToken =
+      request.cookies[CookieName.ACCESS_TOKEN] ||
+      request.headers['authorization'];
+    accessToken = accessToken.replace('Bearer ', '');
 
     if (!accessToken) {
       throw new UnauthorizedException('Access token is missing');
@@ -41,22 +42,18 @@ export class JwtTokenVerifyGuard implements CanActivate {
     let decodedAccessToken: IDecodedAccecssTokenType;
     try {
       decodedAccessToken = this.jwt.verify(accessToken);
+      decodedAccessToken.originalToken = accessToken;
       request.decodedAccessToken = decodedAccessToken;
     } catch (error) {
       throw new UnauthorizedException('Invalid access token');
     }
 
-    return this.validateTokenKeyMatch(
-      decodedAccessToken,
-      accessToken,
-      request.headers['user-agent'],
-    );
+    return this.validateTokenKeyMatch(sessionId, decodedAccessToken);
   }
 
   private async validateTokenKeyMatch(
+    sessionId: string,
     decodedAccessToken: IDecodedAccecssTokenType,
-    accessToken: string,
-    userAgent: string,
   ): Promise<boolean> {
     if (!decodedAccessToken.userId || !decodedAccessToken.username)
       throw new UnauthorizedException(
@@ -70,36 +67,29 @@ export class JwtTokenVerifyGuard implements CanActivate {
       },
     });
 
-    const userSession = await this.prismaService.user_sessions.findFirst({
+    const userSession = await this.prismaService.userSession.findFirst({
       where: {
-        AND: [
-          {
-            user_id: decodedAccessToken.userId,
-            token: accessToken,
-            user_agent: userAgent,
-          },
-        ],
+        id: sessionId,
       },
     });
-
     if (!userSession) {
       throw new UnauthorizedException('Invalid login session');
     }
 
-    if (!user || !user.refresh_token) {
+    if (!user || !user.refreshToken) {
       throw new UnauthorizedException('User not found or has been deleted');
     }
-    if (user.is_banned) throw new ForbiddenException('User has been banned');
+    if (user.isBanned) throw new ForbiddenException('User has been banned');
 
-    let decodedRefreshToken: any;
-    try {
-      decodedRefreshToken = this.jwt.verify(user.refresh_token);
-    } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-    if (decodedAccessToken.key !== decodedRefreshToken.key) {
-      throw new UnauthorizedException('Tokens have been leaked');
-    }
+    // let decodedRefreshToken: any;
+    // try {
+    //   decodedRefreshToken = this.jwt.verify(user.refreshToken);
+    // } catch (error) {
+    //   throw new UnauthorizedException('Invalid refresh token');
+    // }
+    // if (decodedAccessToken.key !== decodedRefreshToken.key) {
+    //   throw new UnauthorizedException('Tokens have been leaked');
+    // }
     return true;
   }
 }

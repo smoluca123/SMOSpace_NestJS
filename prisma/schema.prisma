@@ -1,58 +1,120 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model auth_code {
-  id        Int     @id @default(autoincrement())
-  auth_code String? @db.VarChar(255)
+// model auth_code {
+//   id        Int     @id @default(autoincrement())
+//   auth_code String? @db.VarChar(255)
+// }
+
+//* New AuthCode Model
+model AuthCode {
+  id       String  @id @default(uuid())
+  authCode String? @default(uuid()) @map("auth_code")
+
+  @@map("auth_codes")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-model user {
-  id            String          @id @db.VarChar(255)
-  username      String?         @db.VarChar(255)
-  email         String?         @db.VarChar(255)
-  password      String?         @db.VarChar(255)
-  full_name     String?         @db.VarChar(255)
-  phone_number  String?         @db.VarChar(11)
-  age           Int?            @db.SmallInt
-  type          String?         @default("1") @db.VarChar(255)
-  refresh_token String?         @db.Text
-  display_name  String?         @db.VarChar(255)
-  created_at    DateTime?       @db.DateTime(0)
-  updated_at    DateTime?       @db.DateTime(0)
-  avatar        String?         @db.Text
-  is_active     Int             @default(0)
-  is_banned     Int             @default(0)
-  user_type     user_type?      @relation(fields: [type], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "type_user_type_id")
-  user_sessions user_sessions[]
+// model user {
+//   id            String          @id @db.VarChar(255)
+//   username      String?         @db.VarChar(255)
+//   email         String?         @db.VarChar(255)
+//   password      String?         @db.VarChar(255)
+//   full_name     String?         @db.VarChar(255)
+//   phone_number  String?         @db.VarChar(11)
+//   age           Int?            @db.SmallInt
+//   type          String?         @default("1") @db.VarChar(255)
+//   refresh_token String?         @db.Text
+//   display_name  String?         @db.VarChar(255)
+//   created_at    DateTime?       @db.DateTime(0)
+//   updated_at    DateTime?       @db.DateTime(0)
+//   avatar        String?         @db.Text
+//   is_active     Int             @default(0)
+//   is_banned     Int             @default(0)
+//   user_type     user_type?      @relation(fields: [type], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "type_user_type_id")
+//   user_sessions user_sessions[]
 
-  @@index([type], map: "type_user_type_id")
+//   @@index([type], map: "type_user_type_id")
+// }
+
+//* New User Model
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  email        String?   @unique
+  fullName     String    @map("full_name")
+  displayName  String?   @map("display_name")
+  password     String?
+  type         String
+  phoneNumber  String?   @map("phone_number")
+  age          Int?
+  refreshToken String?   @map("refresh_token")
+  avatar       String?
+  isActive     Boolean?  @default(false) @map("is_active")
+  isVerified   Boolean?  @default(false) @map("is_verified")
+  isBanned     Boolean?  @default(false) @map("is_banned")
+  createdAt    DateTime? @default(now()) @map("created_at")
+  updatedAt    DateTime? @default(now()) @updatedAt @map("updated_at")
+  credits      Int?      @default(0)
+
+  userType    UserType      @relation(fields: [type], references: [id], onDelete: Restrict)
+  UserSession UserSession[]
+
+  @@map("users")
 }
 
-model user_type {
-  id        String  @id @db.VarChar(255)
-  type_name String? @db.VarChar(255)
-  user      user[]
+// model user_type {
+//   id        String  @id @db.VarChar(255)
+//   type_name String? @db.VarChar(255)
+//   user      user[]
+// }
+
+//* New User Type Model
+
+model UserType {
+  id       String  @id @default(uuid())
+  typeName String? @map("type_name")
+  User     User[]
+
+  @@map("user_types")
 }
 
-model user_sessions {
-  id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  user_id       String   @db.VarChar(255)
-  token         String   @db.Text
-  ip_address    String   @db.VarChar(45)
-  user_agent    String?  @db.Text
-  payload       String?  @db.Text
-  last_activity DateTime @default(now()) @db.Timestamp(0)
-  created_at    DateTime @default(now()) @db.Timestamp(0)
-  expires_at    DateTime @default(now()) @db.Timestamp(0)
-  user          user     @relation(fields: [user_id], references: [id], onUpdate: Restrict, map: "user_id_index")
+// model user_sessions {
+//   id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+//   user_id       String   @db.VarChar(255)
+//   token         String   @db.Text
+//   ip_address    String   @db.VarChar(45)
+//   user_agent    String?  @db.Text
+//   payload       String?  @db.Text
+//   last_activity DateTime @default(now()) @db.Timestamp(0)
+//   created_at    DateTime @default(now()) @db.Timestamp(0)
+//   expires_at    DateTime @default(now()) @db.Timestamp(0)
+//   user          user     @relation(fields: [user_id], references: [id], onUpdate: Restrict, map: "user_id_index")
 
-  @@index([last_activity], map: "last_activity_index")
-  @@index([user_id], map: "user_id_index")
+//   @@index([last_activity], map: "last_activity_index")
+//   @@index([user_id], map: "user_id_index")
+// }
+
+//* New UserSessions
+model UserSession {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  token        String
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  payload      String?
+  lastActivity DateTime @default(now()) @map("last_activity")
+  createdAt    DateTime @default(now()) @map("created_at")
+  expiresAt    DateTime @default(now()) @map("expires_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
 }

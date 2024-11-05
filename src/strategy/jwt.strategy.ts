@@ -17,12 +17,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { id: number; auth_code: string }) {
-    const auth = await this.prisma.auth_code.findFirst({
+  async validate(payload: { id: string; authCode: string }) {
+    const auth = await this.prisma.authCode.findFirst({
       where: {
         id: payload.id,
         AND: {
-          auth_code: payload.auth_code,
+          authCode: payload.authCode,
         },
       },
     });

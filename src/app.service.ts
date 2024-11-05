@@ -6,11 +6,11 @@ export class AppService {
   constructor() {}
   getInfoApi(): IInfoApiType {
     return {
-      name: 'Discord API',
+      name: 'Social Media App API',
       version: '1.0.0',
       author: 'Luca Dev',
       swagger: '/swagger',
-      description: 'New Discord API',
+      description: 'New Social Media API',
     };
   }
 }
