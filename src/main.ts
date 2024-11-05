@@ -11,8 +11,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const configDocument = new DocumentBuilder()
-    .setTitle('Ecommerce API')
-    .setDescription('New Ecommerce API')
+    .setTitle('Social Media API')
+    .setDescription('New Social Media API')
     .setVersion('1.0.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
     .build();

@@ -13,15 +13,15 @@ export class UserRegisterDto {
   @ApiProperty({ default: '' })
   @IsString()
   @IsNotEmpty()
-  display_name: string;
+  displayName: string;
   @ApiProperty({ default: '' })
   @IsString()
   @IsNotEmpty()
-  full_name: string;
+  fullName: string;
   @ApiProperty({ default: '' })
   @IsString()
   @IsNotEmpty()
-  phone_number: string;
+  phoneNumber: string;
   @ApiProperty({ default: 0 })
   @IsNumber()
   @IsNotEmpty()

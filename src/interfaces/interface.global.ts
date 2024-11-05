@@ -10,6 +10,7 @@ export interface IResponseType<ResultDataType = any> {
 export interface IDecodedAccecssTokenType {
   userId: string;
   username: string;
+  originalToken: string;
   key: string | number;
   iat?: string | number;
   exp?: string | number;

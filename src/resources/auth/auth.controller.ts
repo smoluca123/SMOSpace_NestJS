@@ -11,6 +11,7 @@ import {
   decoratorsAuthLogin,
   decoratorsAuthLogout,
   decoratorsAuthRegister,
+  decoratorsValidateSession,
 } from 'src/resources/auth/auth.decorators';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
 import { Response } from 'express';
@@ -62,22 +63,23 @@ export class AuthController {
     );
   }
 
+  @Get('/validate-session')
+  @decoratorsValidateSession()
+  authValidateSession(
+    @Cookies(CookieName.SESSION_ID) sessionId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ): Promise<IResponseType> {
+    return this.authService.authValidateSession(sessionId, decodedAccessToken);
+  }
+
   @Get('/logout')
   @decoratorsAuthLogout()
-  getInfomation(
-    @Cookies(CookieName.ACCESS_TOKEN) accessToken: string,
-    @Cookies(CookieName.SESSION_ID) sessionId: number,
+  authLogout(
+    @Cookies(CookieName.SESSION_ID) sessionId: string,
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
-    @UserAgent() userAgent: string,
     @Res({ passthrough: true }) response: Response,
   ): Promise<IResponseType> {
-    return this.authService.authLogout(
-      sessionId,
-      decodedAccessToken,
-      accessToken,
-      userAgent,
-      response,
-    );
+    return this.authService.authLogout(sessionId, decodedAccessToken, response);
   }
 
   // @Get('lyric/:trackId')
