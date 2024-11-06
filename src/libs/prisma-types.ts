@@ -24,3 +24,12 @@ export const userDataSelect = {
   },
   avatar: true,
 } satisfies Prisma.UserSelect;
+
+export type UserDataType = Prisma.UserGetPayload<{
+  select: typeof userDataSelect;
+}>;
+
+export const userSessionDataSelect = {
+  id: true,
+  expiresAt: true,
+} satisfies Prisma.UserSessionSelect;

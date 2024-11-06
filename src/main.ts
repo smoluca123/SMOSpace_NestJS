@@ -24,7 +24,11 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe());
 
   // Enable Cors (Cross-Origin Resource Sharing) middleware
-  app.enableCors();
+  app.enableCors({
+    origin: ['http://localhost:3000'],
+    credentials: true,
+    exposedHeaders: ['set-cookie'],
+  });
 
   // Use Cookie Parser middleware
   app.use(cookieParser());

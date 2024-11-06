@@ -24,6 +24,7 @@ export class JwtTokenVerifyGuard implements CanActivate {
   ): boolean | Promise<boolean> | Observable<boolean> {
     interface RequestNewType extends RequestExpress {
       decodedAccessToken?: IDecodedAccecssTokenType;
+      sessionId?: string;
     }
     const request = context.switchToHttp().getRequest() as RequestNewType;
 
@@ -44,6 +45,7 @@ export class JwtTokenVerifyGuard implements CanActivate {
       decodedAccessToken = this.jwt.verify(accessToken);
       decodedAccessToken.originalToken = accessToken;
       request.decodedAccessToken = decodedAccessToken;
+      request.sessionId = sessionId;
     } catch (error) {
       throw new UnauthorizedException('Invalid access token');
     }
@@ -69,7 +71,10 @@ export class JwtTokenVerifyGuard implements CanActivate {
 
     const userSession = await this.prismaService.userSession.findFirst({
       where: {
-        id: sessionId,
+        AND: {
+          id: sessionId,
+          token: decodedAccessToken.originalToken,
+        },
       },
     });
     if (!userSession) {
