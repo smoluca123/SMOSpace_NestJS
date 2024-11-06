@@ -28,6 +28,7 @@ import {
 } from 'src/libs/prisma-types';
 import { UserSession } from '@prisma/client';
 import { fromUnixTime } from 'date-fns';
+import { defaultOptionsCookie } from 'src/utils/utils';
 // import { Response } from 'express';
 
 @Injectable()
@@ -101,14 +102,12 @@ export class AuthService {
         ipAddress,
       });
       response.cookie(CookieName.ACCESS_TOKEN, accessToken, {
-        httpOnly: true,
-        secure: this.config.get('NODE_ENV') === 'production',
-        sameSite: 'strict',
+        ...defaultOptionsCookie,
+        expires: sessionResult.data.expiresAt,
       });
       response.cookie(CookieName.SESSION_ID, sessionResult.data.id, {
-        httpOnly: true,
-        secure: this.config.get('NODE_ENV') === 'production',
-        sameSite: 'strict',
+        ...defaultOptionsCookie,
+        expires: sessionResult.data.expiresAt,
       });
 
       return {
@@ -204,14 +203,12 @@ export class AuthService {
       });
 
       res.cookie(CookieName.ACCESS_TOKEN, accessToken, {
-        httpOnly: true,
-        secure: this.config.get('NODE_ENV') === 'production',
-        sameSite: 'strict',
+        ...defaultOptionsCookie,
+        expires: sessionResult.data.expiresAt,
       });
       res.cookie(CookieName.SESSION_ID, sessionResult.data.id, {
-        httpOnly: true,
-        secure: this.config.get('NODE_ENV') === 'production',
-        sameSite: 'strict',
+        ...defaultOptionsCookie,
+        expires: sessionResult.data.expiresAt,
       });
 
       return {

@@ -25,9 +25,17 @@ async function bootstrap() {
 
   // Enable Cors (Cross-Origin Resource Sharing) middleware
   app.enableCors({
-    origin: ['http://localhost:3000'],
+    origin: [
+      'http://localhost:3000',
+      config.FRONTEND_URL1,
+      config.FRONTEND_URL2,
+      config.FRONTEND_URL3,
+      config.FRONTEND_URL4,
+    ],
     credentials: true,
     exposedHeaders: ['set-cookie'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Use Cookie Parser middleware
