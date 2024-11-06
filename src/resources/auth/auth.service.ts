@@ -18,8 +18,6 @@ import { ConfigService } from '@nestjs/config';
 import { UserRegisterDto } from 'src/resources/auth/dto/UserRegister.dto';
 import { JwtServiceCustom } from 'src/jwt/jwt.service';
 import { JwtService } from '@nestjs/jwt';
-import { Response } from 'express';
-import { CookieName } from 'src/global/enums.global';
 import { HttpService } from '@nestjs/axios';
 import {
   userDataSelect,
@@ -28,7 +26,6 @@ import {
 } from 'src/libs/prisma-types';
 import { UserSession } from '@prisma/client';
 import { fromUnixTime } from 'date-fns';
-import { defaultOptionsCookie } from 'src/utils/utils';
 // import { Response } from 'express';
 
 @Injectable()
@@ -42,10 +39,9 @@ export class AuthService {
   ) {}
   async authLogin(
     credentials: UserLoginDto,
-    response: Response,
     userAgent: string,
     ipAddress: string,
-  ): Promise<IResponseType<UserDataType>> {
+  ): Promise<IResponseType<UserDataType & { accessToken: string }>> {
     try {
       const { username, password } = credentials;
 
@@ -65,13 +61,16 @@ export class AuthService {
 
       // Generate JWT
       const key = uuidv4();
+      const sessionId = uuidv4();
       const accessToken = await this.jwtCustom.generateAccessToken({
+        sessionId,
         userId: checkUser.id,
         username: checkUser.username,
         key,
       });
       const refreshToken = await this.jwtCustom.generateAccessToken(
         {
+          sessionId,
           userId: checkUser.id,
           username: checkUser.username,
           key,
@@ -96,23 +95,16 @@ export class AuthService {
       /* eslint-enable @typescript-eslint/no-unused-vars*/
 
       // Set the session
-      const sessionResult = await this.setAuthSession({
+      await this.setAuthSession({
+        sessionId,
         accessToken,
         userAgent,
         ipAddress,
       });
-      response.cookie(CookieName.ACCESS_TOKEN, accessToken, {
-        ...defaultOptionsCookie,
-        expires: sessionResult.data.expiresAt,
-      });
-      response.cookie(CookieName.SESSION_ID, sessionResult.data.id, {
-        ...defaultOptionsCookie,
-        expires: sessionResult.data.expiresAt,
-      });
 
       return {
         message: 'Logged in successfully',
-        data: resultUser,
+        data: { ...resultUser, accessToken },
         statusCode: 200,
         date: new Date(),
       };
@@ -123,10 +115,9 @@ export class AuthService {
 
   async authRegister(
     credentials: UserRegisterDto,
-    res: Response,
     userAgent: string,
     ipAddress: string,
-  ): Promise<IResponseType<UserDataType>> {
+  ): Promise<IResponseType<UserDataType & { accessToken: string }>> {
     try {
       const {
         username,
@@ -148,13 +139,16 @@ export class AuthService {
       //   Generate JWT
       const userId = uuidv4();
       const key = uuidv4();
+      const sessionId = uuidv4();
       const accessToken = await this.jwtCustom.generateAccessToken({
+        sessionId,
         userId,
         username,
         key,
       });
       const refreshToken = await this.jwtCustom.generateAccessToken(
         {
+          sessionId,
           userId,
           username,
           key,
@@ -196,24 +190,16 @@ export class AuthService {
       /*   eslint-enable @typescript-eslint/no-unused-vars*/
 
       // Set the session
-      const sessionResult = await this.setAuthSession({
+      await this.setAuthSession({
+        sessionId,
         accessToken,
         userAgent,
         ipAddress,
       });
 
-      res.cookie(CookieName.ACCESS_TOKEN, accessToken, {
-        ...defaultOptionsCookie,
-        expires: sessionResult.data.expiresAt,
-      });
-      res.cookie(CookieName.SESSION_ID, sessionResult.data.id, {
-        ...defaultOptionsCookie,
-        expires: sessionResult.data.expiresAt,
-      });
-
       return {
         message: 'User registered successfully',
-        data: resultUser,
+        data: { ...resultUser, accessToken },
         statusCode: 201,
         date: new Date(),
       };
@@ -223,31 +209,18 @@ export class AuthService {
   }
 
   async authLogout(
-    sessionId: string,
     decodedAccessToken: IDecodedAccecssTokenType,
-    response: Response,
   ): Promise<IResponseType> {
     try {
-      const { userId } = decodedAccessToken;
+      const { userId, sessionId } = decodedAccessToken;
 
       await this.prisma.user.update({
         where: { id: userId },
         data: { refreshToken: null },
       });
 
-      // await this.prisma.user_sessions.delete({
-      //   where: {
-      //     id: sessionId,
-      //     user_id: userId,
-      //     token: accessToken,
-      //     user_agent: userAgent,
-      //   },
-      // });
-
       // Delete session
       await this.removeAuthSession(sessionId);
-      response.clearCookie(CookieName.ACCESS_TOKEN);
-      response.clearCookie(CookieName.SESSION_ID);
 
       return {
         message: 'Logged out successfully',
@@ -261,15 +234,13 @@ export class AuthService {
   }
 
   async authValidateSession(
-    sessionId: string,
     decodedAccessToken: IDecodedAccecssTokenType,
-    response: Response,
   ): Promise<
     IResponseType<{ id: string; expiresAt: Date; user: UserDataType }>
   > {
     try {
       const sessionResult = await this.prisma.userSession.findUnique({
-        where: { id: sessionId },
+        where: { id: decodedAccessToken.sessionId },
         select: { id: true, expiresAt: true, user: { select: userDataSelect } },
       });
 
@@ -277,8 +248,6 @@ export class AuthService {
         !sessionResult ||
         sessionResult.user.id !== decodedAccessToken.userId
       ) {
-        response.clearCookie(CookieName.ACCESS_TOKEN);
-        response.clearCookie(CookieName.SESSION_ID);
         throw new UnauthorizedException('Invalid session or expired session');
       }
 
@@ -295,11 +264,13 @@ export class AuthService {
 
   //   ----------------- Utils
   async setAuthSession({
+    sessionId,
     accessToken,
     ipAddress,
     userAgent,
     payload,
   }: {
+    sessionId: string;
     accessToken: string;
     userAgent: string;
     ipAddress: string;
@@ -315,6 +286,7 @@ export class AuthService {
       const checkUserSession = await this.prisma.userSession.findFirst({
         where: {
           AND: {
+            id: sessionId,
             userId: userId,
             userAgent: userAgent,
           },
@@ -327,6 +299,7 @@ export class AuthService {
           id: checkUserSession?.id || '',
         },
         create: {
+          id: sessionId,
           ipAddress: ipAddress,
           token: accessToken,
           createdAt: currentDate,
@@ -401,41 +374,4 @@ export class AuthService {
       handleDefaultError(error);
     }
   }
-
-  // async getLyric(trackId: string): Promise<IResponseType> {
-  //   try {
-  //     // const spotClient = new LyricsClient(this.config.get('SPOTIFY_COOKIE'));
-  //     const { accessToken } = await fetch(
-  //       'https://open.spotify.com/get_access_token',
-  //       {
-  //         headers: {
-  //           Cookie: this.config.get('SPOTIFY_COOKIE'),
-  //           'User-Agent':
-  //             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
-  //         },
-  //       },
-  //     ).then((res) => res.json());
-
-  //     const data = await fetch(
-  //       `https://spclient.wg.spotify.com/color-lyrics/v2/track/${trackId}?format=json&vocalRemoval=false&market=from_token`,
-  //       {
-  //         headers: {
-  //           'app-platform': 'WebPlayer',
-  //           Authorization: `Bearer ${accessToken}`,
-  //           'User-Agent':
-  //             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0',
-  //         },
-  //       },
-  //     ).then((res) => res.text());
-
-  //     return {
-  //       data: JSON.parse(data),
-  //       message: 'Get lyric successfully',
-  //       statusCode: 200,
-  //       date: new Date(),
-  //     };
-  //   } catch (error) {
-  //     handleDefaultError(error);
-  //   }
-  // }
 }
