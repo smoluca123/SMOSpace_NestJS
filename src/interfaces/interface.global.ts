@@ -39,6 +39,11 @@ export interface IRequestWithDecodedAuthToken extends Request {
   user: IDecodedAuthTokenType;
 }
 
+export interface IRequestWithFullSession
+  extends IRequestWithDecodedAccessToken {
+  sessionId: string;
+}
+
 export enum RolesLevel {
   USER = 0,
   MANAGER = 1,

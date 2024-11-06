@@ -20,6 +20,7 @@ import { UserAgent } from 'src/decorators/utils.decorator';
 import { IpAddress } from 'src/decorators/ip.decorator';
 import { CookieName } from 'src/global/enums.global';
 import { AuthGuard } from '@nestjs/passport';
+import { UserDataType } from 'src/libs/prisma-types';
 // import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('User Management')
@@ -36,15 +37,13 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
     @UserAgent() userAgent: string,
     @IpAddress() ipAddess: string,
-  ): Promise<IResponseType> {
-    const result = await this.authService.authLogin(
+  ): Promise<IResponseType<UserDataType>> {
+    return await this.authService.authLogin(
       credentials,
       response,
       userAgent,
       ipAddess,
     );
-
-    return result;
   }
 
   @Post('/register')
@@ -54,7 +53,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
     @UserAgent() userAgent: string,
     @IpAddress() ipAddess: string,
-  ): Promise<IResponseType> {
+  ): Promise<IResponseType<UserDataType>> {
     return this.authService.authRegister(
       credentials,
       response,
@@ -68,8 +67,13 @@ export class AuthController {
   authValidateSession(
     @Cookies(CookieName.SESSION_ID) sessionId: string,
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<IResponseType> {
-    return this.authService.authValidateSession(sessionId, decodedAccessToken);
+    return this.authService.authValidateSession(
+      sessionId,
+      decodedAccessToken,
+      response,
+    );
   }
 
   @Get('/logout')

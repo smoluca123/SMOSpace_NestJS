@@ -21,7 +21,11 @@ import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { CookieName } from 'src/global/enums.global';
 import { HttpService } from '@nestjs/axios';
-import { userDataSelect, userTypeDataSelect } from 'src/libs/prisma-types';
+import {
+  userDataSelect,
+  UserDataType,
+  userTypeDataSelect,
+} from 'src/libs/prisma-types';
 import { UserSession } from '@prisma/client';
 import { fromUnixTime } from 'date-fns';
 // import { Response } from 'express';
@@ -40,7 +44,7 @@ export class AuthService {
     response: Response,
     userAgent: string,
     ipAddress: string,
-  ): Promise<IResponseType> {
+  ): Promise<IResponseType<UserDataType>> {
     try {
       const { username, password } = credentials;
 
@@ -96,12 +100,20 @@ export class AuthService {
         userAgent,
         ipAddress,
       });
-      response.cookie(CookieName.ACCESS_TOKEN, accessToken);
-      response.cookie(CookieName.SESSION_ID, sessionResult.data.id);
+      response.cookie(CookieName.ACCESS_TOKEN, accessToken, {
+        httpOnly: true,
+        secure: this.config.get('NODE_ENV') === 'production',
+        sameSite: 'strict',
+      });
+      response.cookie(CookieName.SESSION_ID, sessionResult.data.id, {
+        httpOnly: true,
+        secure: this.config.get('NODE_ENV') === 'production',
+        sameSite: 'strict',
+      });
 
       return {
         message: 'Logged in successfully',
-        data: { ...resultUser, accessToken },
+        data: resultUser,
         statusCode: 200,
         date: new Date(),
       };
@@ -115,7 +127,7 @@ export class AuthService {
     res: Response,
     userAgent: string,
     ipAddress: string,
-  ): Promise<IResponseType> {
+  ): Promise<IResponseType<UserDataType>> {
     try {
       const {
         username,
@@ -190,12 +202,21 @@ export class AuthService {
         userAgent,
         ipAddress,
       });
-      res.cookie(CookieName.ACCESS_TOKEN, accessToken);
-      res.cookie(CookieName.SESSION_ID, sessionResult.data.id);
+
+      res.cookie(CookieName.ACCESS_TOKEN, accessToken, {
+        httpOnly: true,
+        secure: this.config.get('NODE_ENV') === 'production',
+        sameSite: 'strict',
+      });
+      res.cookie(CookieName.SESSION_ID, sessionResult.data.id, {
+        httpOnly: true,
+        secure: this.config.get('NODE_ENV') === 'production',
+        sameSite: 'strict',
+      });
 
       return {
         message: 'User registered successfully',
-        data: { ...resultUser, accessToken },
+        data: resultUser,
         statusCode: 201,
         date: new Date(),
       };
@@ -245,22 +266,28 @@ export class AuthService {
   async authValidateSession(
     sessionId: string,
     decodedAccessToken: IDecodedAccecssTokenType,
-  ) {
+    response: Response,
+  ): Promise<
+    IResponseType<{ id: string; expiresAt: Date; user: UserDataType }>
+  > {
     try {
       const sessionResult = await this.prisma.userSession.findUnique({
         where: { id: sessionId },
-        include: { user: { select: userDataSelect } },
+        select: { id: true, expiresAt: true, user: { select: userDataSelect } },
       });
 
-      if (!sessionResult || sessionResult.userId !== decodedAccessToken.userId)
+      if (
+        !sessionResult ||
+        sessionResult.user.id !== decodedAccessToken.userId
+      ) {
+        response.clearCookie(CookieName.ACCESS_TOKEN);
+        response.clearCookie(CookieName.SESSION_ID);
         throw new UnauthorizedException('Invalid session or expired session');
+      }
 
       return {
         message: 'Session is available',
-        data: {
-          ...sessionResult.user,
-          accessToken: decodedAccessToken.originalToken,
-        },
+        data: sessionResult,
         statusCode: 200,
         date: new Date(),
       };
@@ -293,7 +320,6 @@ export class AuthService {
           AND: {
             userId: userId,
             userAgent: userAgent,
-            ipAddress: ipAddress,
           },
         },
         include: { user: true },
@@ -349,7 +375,6 @@ export class AuthService {
       //     },
       //   });
       // }
-
       return {
         message: 'Set session successfully',
         data: {
