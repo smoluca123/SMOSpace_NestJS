@@ -10,6 +10,7 @@ import { JwtStrategy } from 'src/strategy/jwt.strategy';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { AuthModule } from 'src/resources/auth/auth.module';
 import { JwtModuleCustom } from 'src/jwt/jwt.module';
+import { UserModule } from 'src/resources/user/user.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { JwtModuleCustom } from 'src/jwt/jwt.module';
     JwtModuleCustom,
     PrismaModule,
     AuthModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

@@ -11,7 +11,12 @@ export class JwtServiceCustom {
   ) {}
 
   async generateAccessToken(
-    payload: { userId: string; username: string; key?: string },
+    payload: {
+      sessionId: string;
+      userId: string;
+      username: string;
+      key?: string;
+    },
     options?: JwtSignOptions & { isRefreshToken?: boolean },
   ): Promise<string> {
     try {

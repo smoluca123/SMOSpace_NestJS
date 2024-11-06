@@ -8,6 +8,7 @@ export interface IResponseType<ResultDataType = any> {
 }
 
 export interface IDecodedAccecssTokenType {
+  sessionId: string;
   userId: string;
   username: string;
   originalToken: string;
@@ -18,7 +19,7 @@ export interface IDecodedAccecssTokenType {
 
 export interface IDecodedAuthTokenType {
   id: string;
-  auth_code: string;
+  authCode: string;
   iat?: string | number;
   exp?: string | number;
 }

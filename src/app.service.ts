@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { IInfoApiType } from 'src/interfaces/interface.global';
+import { IInfoApiType } from 'src/interfaces/interfaces.global';
 
 @Injectable()
 export class AppService {

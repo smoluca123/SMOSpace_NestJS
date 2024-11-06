@@ -15,8 +15,9 @@ datasource db {
 
 //* New AuthCode Model
 model AuthCode {
-  id       String  @id @default(uuid())
-  authCode String? @default(uuid()) @map("auth_code")
+  id        String  @id @default(uuid())
+  authCode  String? @default(uuid()) @map("auth_code")
+  roleLevel Int?    @default(0) @map("role_level")
 
   @@map("auth_codes")
 }

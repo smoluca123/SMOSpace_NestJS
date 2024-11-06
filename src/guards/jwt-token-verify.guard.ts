@@ -9,8 +9,7 @@ import { Observable } from 'rxjs';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { Request as RequestExpress } from 'express';
-import { IDecodedAccecssTokenType } from 'src/interfaces/interface.global';
-import { CookieName } from 'src/global/enums.global';
+import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 
 @Injectable()
 export class JwtTokenVerifyGuard implements CanActivate {
@@ -28,12 +27,7 @@ export class JwtTokenVerifyGuard implements CanActivate {
     }
     const request = context.switchToHttp().getRequest() as RequestNewType;
 
-    const sessionId: string = request.cookies[CookieName.SESSION_ID];
-    if (!sessionId) throw new UnauthorizedException('Session ID is missing');
-
-    let accessToken =
-      request.cookies[CookieName.ACCESS_TOKEN] ||
-      request.headers['authorization'];
+    let accessToken = request.headers['accesstoken'] as string;
     accessToken = accessToken.replace('Bearer ', '');
 
     if (!accessToken) {
@@ -45,16 +39,15 @@ export class JwtTokenVerifyGuard implements CanActivate {
       decodedAccessToken = this.jwt.verify(accessToken);
       decodedAccessToken.originalToken = accessToken;
       request.decodedAccessToken = decodedAccessToken;
-      request.sessionId = sessionId;
+      request.sessionId = decodedAccessToken.sessionId;
     } catch (error) {
       throw new UnauthorizedException('Invalid access token');
     }
 
-    return this.validateTokenKeyMatch(sessionId, decodedAccessToken);
+    return this.validateTokenKeyMatch(decodedAccessToken);
   }
 
   private async validateTokenKeyMatch(
-    sessionId: string,
     decodedAccessToken: IDecodedAccecssTokenType,
   ): Promise<boolean> {
     if (!decodedAccessToken.userId || !decodedAccessToken.username)
@@ -72,7 +65,7 @@ export class JwtTokenVerifyGuard implements CanActivate {
     const userSession = await this.prismaService.userSession.findFirst({
       where: {
         AND: {
-          id: sessionId,
+          id: decodedAccessToken.sessionId,
           token: decodedAccessToken.originalToken,
         },
       },

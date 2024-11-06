@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
-import { IInfoApiType } from 'src/interfaces/interface.global';
+import { IInfoApiType } from 'src/interfaces/interfaces.global';
 
 @Controller()
 export class AppController {
