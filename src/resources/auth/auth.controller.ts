@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   IDecodedAccecssTokenType,
   IResponseType,
-} from 'src/interfaces/interface.global';
+} from 'src/interfaces/interfaces.global';
 import { UserLoginDto } from 'src/resources/auth/dto/UserLogin.dto';
 import { UserRegisterDto } from 'src/resources/auth/dto/UserRegister.dto';
 import {
@@ -16,8 +16,8 @@ import {
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
 import { UserAgent } from 'src/decorators/utils.decorator';
 import { IpAddress } from 'src/decorators/ip.decorator';
-import { AuthGuard } from '@nestjs/passport';
 import { UserDataType } from 'src/libs/prisma-types';
+import { AuthGuard } from '@nestjs/passport';
 // import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('User Management')

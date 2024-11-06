@@ -8,7 +8,7 @@ import { handleDefaultError } from 'src/global/functions.global';
 import {
   IDecodedAccecssTokenType,
   IResponseType,
-} from 'src/interfaces/interface.global';
+} from 'src/interfaces/interfaces.global';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UserLoginDto } from 'src/resources/auth/dto/UserLogin.dto';
 import * as bcrypt from 'bcrypt';
