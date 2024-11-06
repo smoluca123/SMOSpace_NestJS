@@ -19,7 +19,7 @@ export interface IDecodedAccecssTokenType {
 
 export interface IDecodedAuthTokenType {
   id: string;
-  auth_code: string;
+  authCode: string;
   iat?: string | number;
   exp?: string | number;
 }

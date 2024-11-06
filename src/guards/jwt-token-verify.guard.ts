@@ -9,7 +9,7 @@ import { Observable } from 'rxjs';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { Request as RequestExpress } from 'express';
-import { IDecodedAccecssTokenType } from 'src/interfaces/interface.global';
+import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 
 @Injectable()
 export class JwtTokenVerifyGuard implements CanActivate {
