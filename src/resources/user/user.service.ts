@@ -10,10 +10,16 @@ import {
 } from 'src/interfaces/interfaces.global';
 import { userDataSelect, UserDataType } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { UpdateProfileDto } from 'src/resources/user/dto/user.dto';
+import * as bcrypt from 'bcrypt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
   async getInfomation(
     decodedAccessToken: IDecodedAccecssTokenType,
   ): Promise<IResponseType<UserDataType>> {
@@ -55,6 +61,74 @@ export class UserService {
 
       return {
         message: 'Get user information successfully',
+        data: user,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async updateInfomation(
+    decodedAccessToken: IDecodedAccecssTokenType,
+    data: UpdateProfileDto,
+  ) {
+    try {
+      Object.keys(data).forEach(async (key) => {
+        if (!data[key]) {
+          data[key] = undefined;
+          return;
+        }
+        if (key === 'password') {
+          data[key] = await bcrypt.hash(data[key], 10);
+        }
+      });
+      const user = await this.prisma.user.update({
+        where: {
+          id: decodedAccessToken.userId,
+        },
+        data,
+        select: userDataSelect,
+      });
+
+      if (!user) throw new NotFoundException('User not found');
+
+      return {
+        message: 'Update information successfully',
+        data: user,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async updateUserInfomation(userId: string, data: UpdateProfileDto) {
+    try {
+      if (!userId) throw new BadRequestException('User ID is required');
+
+      Object.keys(data).forEach(async (key) => {
+        if (typeof data[key] !== 'boolean' && !data[key]) {
+          data[key] = undefined;
+          return;
+        }
+        if (key === 'password') {
+          data[key] = await bcrypt.hash(data[key], 10);
+        }
+      });
+      const user = await this.prisma.user.update({
+        where: {
+          id: userId,
+        },
+        data,
+        select: userDataSelect,
+      });
+      if (!user) throw new NotFoundException('User not found');
+
+      return {
+        message: 'Update user information successfully',
         data: user,
         statusCode: 200,
         date: new Date(),

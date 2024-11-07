@@ -25,3 +25,24 @@ export const getUserInfomationDecorator = () =>
       description: 'Get user infomation by id API',
     }),
   );
+
+export const updateInfomationDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Update infomation API',
+      description: 'Update infomation by accessToken API',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+  );
+
+export const updateUserInfomationDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Update user infomation API',
+      description: 'Update user infomation by id API',
+    }),
+  );
