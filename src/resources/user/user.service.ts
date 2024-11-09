@@ -13,12 +13,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { BanUserDto, UpdateProfileDto } from 'src/resources/user/dto/user.dto';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
+import { SupabaseService } from 'src/supabase/supabase.service';
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly supabase: SupabaseService,
   ) {}
   async getInfomation(
     decodedAccessToken: IDecodedAccecssTokenType,
@@ -151,6 +153,39 @@ export class UserService {
       return {
         message: 'Update user information successfully',
         data: user,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async updateUserAvatar(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<IResponseType<UserDataType>> {
+    try {
+      if (!userId) throw new BadRequestException('User ID is required');
+
+      const checkUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!checkUser) throw new NotFoundException('User not found');
+
+      const { url } = await this.supabase.uploadFile(file);
+
+      // console.log(uploadedAvatar);
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: { avatar: url },
+        select: userDataSelect,
+      });
+
+      return {
+        message: 'Update user avatar successfully',
+        data: updatedUser,
         statusCode: 200,
         date: new Date(),
       };
