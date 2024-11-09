@@ -1,8 +1,17 @@
-import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserDataType } from 'src/libs/prisma-types';
 import {
+  banUserDecorator,
   getInfomationDecorator,
   getUserInfomationDecorator,
   updateInfomationDecorator,
@@ -16,6 +25,7 @@ import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator'
 import { AuthGuard } from '@nestjs/passport';
 import { RoleGuard } from 'src/guards/role.guard';
 import {
+  BanUserDto,
   UpdateProfileDto,
   UpdateUserDto,
 } from 'src/resources/user/dto/user.dto';
@@ -41,6 +51,15 @@ export class UserController {
     @Param('userId') userId: string,
   ): Promise<IResponseType<UserDataType>> {
     return this.userService.getUserInfomation(userId);
+  }
+
+  @Post('/ban/:userId')
+  @banUserDecorator()
+  async banUser(
+    @Param('userId') userId: string,
+    @Body() banUserData: BanUserDto,
+  ): Promise<IResponseType> {
+    return this.userService.banUser(userId, banUserData);
   }
 
   @Put('/me')

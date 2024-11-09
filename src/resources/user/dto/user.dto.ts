@@ -36,3 +36,9 @@ export class UpdateUserDto extends UpdateProfileDto {
   @IsBoolean()
   isBanned: boolean;
 }
+
+export class BanUserDto {
+  @ApiProperty({ default: false })
+  @IsBoolean()
+  isBanned: boolean;
+}
