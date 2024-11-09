@@ -2,9 +2,12 @@ import {
   Body,
   Controller,
   Get,
+  MaxFileSizeValidator,
   Param,
+  ParseFilePipe,
   Post,
   Put,
+  UploadedFile,
   UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
@@ -15,6 +18,7 @@ import {
   getInfomationDecorator,
   getUserInfomationDecorator,
   updateInfomationDecorator,
+  updateUserAvatarDecorator,
   updateUserInfomationDecorator,
 } from 'src/resources/user/user.decorators';
 import {
@@ -29,6 +33,7 @@ import {
   UpdateProfileDto,
   UpdateUserDto,
 } from 'src/resources/user/dto/user.dto';
+import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
@@ -62,16 +67,38 @@ export class UserController {
     return this.userService.banUser(userId, banUserData);
   }
 
+  @Post('/avatar/:userId')
+  @updateUserAvatarDecorator()
+  async updateUserAvatar(
+    @Param('userId') userId: string,
+    @UploadedFile(
+      FileIsImageValidationPipe,
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: 1024 * 1024 * 5,
+            message: 'File size is too large, max 5MB',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ): Promise<IResponseType<UserDataType>> {
+    return this.userService.updateUserAvatar(userId, file);
+  }
+
   @Put('/me')
   @updateInfomationDecorator()
   async updateInfomation(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
     @Body() updateProfileDto: UpdateProfileDto,
   ): Promise<IResponseType<UserDataType>> {
-    return this.userService.updateInfomation(
-      decodedAccessToken,
-      updateProfileDto,
-    );
+    const userId = decodedAccessToken.userId;
+    // return this.userService.updateInfomation(
+    //   decodedAccessToken,
+    //   updateProfileDto,
+    // );
+    return this.userService.updateUserInfomation(userId, updateProfileDto);
   }
 
   @Put('/:userId')

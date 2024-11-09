@@ -42,3 +42,11 @@ export class BanUserDto {
   @IsBoolean()
   isBanned: boolean;
 }
+
+export class UserAvatarUpdateDto {
+  @ApiProperty({
+    type: 'file',
+    description: 'Max size : 5MB per file, Only Accept Image File',
+  })
+  file: Express.Multer.File;
+}
