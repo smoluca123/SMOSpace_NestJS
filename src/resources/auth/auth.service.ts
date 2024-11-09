@@ -51,6 +51,7 @@ export class AuthService {
       });
 
       if (!checkUser) throw new NotFoundException('User not found');
+      if (checkUser.isBanned) throw new UnauthorizedException('User is banned');
 
       const isMatchPassword = await bcrypt.compare(
         password,

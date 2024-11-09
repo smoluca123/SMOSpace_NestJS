@@ -10,7 +10,7 @@ import {
 } from 'src/interfaces/interfaces.global';
 import { userDataSelect, UserDataType } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { UpdateProfileDto } from 'src/resources/user/dto/user.dto';
+import { BanUserDto, UpdateProfileDto } from 'src/resources/user/dto/user.dto';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 
@@ -50,9 +50,11 @@ export class UserService {
     try {
       if (!userId) throw new BadRequestException('User ID is required');
 
-      const user = await this.prisma.user.findUnique({
+      const user = await this.prisma.user.findFirst({
         where: {
-          id: userId,
+          // username: userId,
+          OR: [{ username: userId }, { id: userId }],
+          // OR: [{  }],
         },
         select: userDataSelect,
       });
@@ -63,6 +65,25 @@ export class UserService {
         message: 'Get user information successfully',
         data: user,
         statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async banUser(userId: string, data: BanUserDto): Promise<IResponseType> {
+    try {
+      if (!userId) throw new BadRequestException('User ID is required');
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { isBanned: data.isBanned },
+      });
+      return {
+        message: `${data.isBanned ? 'Ban' : 'Unban'} user successfully`,
+        data: null,
+        statusCode: 204,
         date: new Date(),
       };
     } catch (error) {
