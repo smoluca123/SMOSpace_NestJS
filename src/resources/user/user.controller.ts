@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   MaxFileSizeValidator,
   Param,
   ParseFilePipe,
@@ -11,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
 import { UserDataType } from 'src/libs/prisma-types';
 import {
   banUserDecorator,
@@ -30,6 +31,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RoleGuard } from 'src/guards/role.guard';
 import {
   BanUserDto,
+  RefreshTokenResponseDto,
   UpdateProfileDto,
   UpdateUserDto,
   UserActiveByCodeDto,
@@ -153,5 +155,16 @@ export class UserController {
     @Body() verificationData: UserActiveByCodeDto,
   ): Promise<IResponseType<UserDataType>> {
     return this.userService.userActiveByCode(userId, verificationData);
+  }
+
+  @Post('/refresh-token')
+  @ApiHeader({
+    name: 'accessToken',
+    required: true,
+  })
+  async refreshToken(
+    @Headers('accessToken') accessToken: string,
+  ): Promise<IResponseType<RefreshTokenResponseDto>> {
+    return this.userService.refreshToken(accessToken);
   }
 }

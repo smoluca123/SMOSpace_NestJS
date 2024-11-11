@@ -65,3 +65,14 @@ export class UserActiveByCodeDto {
   @IsNotEmpty()
   verifyCode: string;
 }
+
+export class RefreshTokenDto {
+  @ApiProperty({ default: '' })
+  @IsString()
+  @IsNotEmpty()
+  accessToken: string;
+}
+
+export class RefreshTokenResponseDto {
+  accessToken: string;
+}

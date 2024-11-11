@@ -287,7 +287,6 @@ export class AuthService {
       const checkUserSession = await this.prisma.userSession.findFirst({
         where: {
           AND: {
-            id: sessionId,
             userId: userId,
             userAgent: userAgent,
           },
@@ -311,6 +310,7 @@ export class AuthService {
           payload: JSON.stringify(payload),
         },
         update: {
+          id: sessionId,
           lastActivity: currentDate,
           expiresAt,
           token: accessToken,

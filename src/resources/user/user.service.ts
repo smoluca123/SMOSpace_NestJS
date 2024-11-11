@@ -16,6 +16,7 @@ import { userDataSelect, UserDataType } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   BanUserDto,
+  RefreshTokenResponseDto,
   UpdateProfileDto,
   UserActiveByCodeDto,
 } from 'src/resources/user/dto/user.dto';
@@ -23,7 +24,10 @@ import * as bcrypt from 'bcryptjs';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from 'src/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
-import { addMinutes, isPast } from 'date-fns';
+import { addMinutes, fromUnixTime, isPast } from 'date-fns';
+import { JwtServiceCustom } from 'src/jwt/jwt.service';
+import { v4 } from 'uuid';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class UserService {
@@ -32,6 +36,8 @@ export class UserService {
     private readonly config: ConfigService,
     private readonly supabase: SupabaseService,
     private readonly emailService: EmailService,
+    private readonly jwt: JwtService,
+    private readonly customJwt: JwtServiceCustom,
   ) {}
   async getInfomation(
     decodedAccessToken: IDecodedAccecssTokenType,
@@ -384,6 +390,56 @@ export class UserService {
       return {
         message: 'User activated successfully',
         data: updatedUser,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async refreshToken(
+    oldAccessToken: string,
+  ): Promise<IResponseType<RefreshTokenResponseDto>> {
+    try {
+      const { sessionId, userId, username } =
+        await this.jwt.verifyAsync<IDecodedAccecssTokenType>(oldAccessToken, {
+          ignoreExpiration: true,
+        });
+
+      const key = v4();
+      const accessToken = await this.customJwt.generateAccessToken({
+        sessionId,
+        userId,
+        username,
+        key,
+      });
+      const refreshToken = await this.customJwt.generateAccessToken(
+        { sessionId, userId, username, key },
+        { isRefreshToken: true },
+      );
+
+      const { exp } =
+        await this.jwt.verifyAsync<IDecodedAccecssTokenType>(accessToken);
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { refreshToken },
+      });
+
+      await this.prisma.userSession.update({
+        where: { id: sessionId },
+        data: {
+          token: accessToken,
+          expiresAt: fromUnixTime(+exp),
+        },
+      });
+
+      return {
+        message: 'Refresh token successfully generated',
+        data: {
+          accessToken,
+        },
         statusCode: 200,
         date: new Date(),
       };
