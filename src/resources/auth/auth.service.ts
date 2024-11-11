@@ -11,7 +11,7 @@ import {
 } from 'src/interfaces/interfaces.global';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UserLoginDto } from 'src/resources/auth/dto/UserLogin.dto';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
 

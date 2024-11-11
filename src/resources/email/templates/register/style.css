@@ -1,0 +1,51 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f6f8fa;
+    height: 100vh;
+    width: 100vw;
+}
+
+.welcome {
+    color: #eb4242;
+    margin-top: 2px;
+}
+
+.top-line {
+    height: 3px;
+    background-color: #eb4242;
+}
+
+.mail-wrapper {
+    width: 60%;
+    background:
+        white;
+    margin: 0 auto;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.name {
+    color: black;
+}
+
+.confirm-btn {
+    display: block;
+    background-color: #eb4242;
+    width: fit-content;
+    margin: 0 auto;
+    padding: 10px 20px;
+    color:
+        white !important;
+    text-decoration: none;
+    border-radius: 8px;
+    transition:
+        all linear 0.2s;
+}
+
+.confirm-btn:hover {
+    background-color: #e60023;
+}

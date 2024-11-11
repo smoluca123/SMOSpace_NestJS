@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
 export class UpdateProfileDto {
   @ApiProperty({ default: '' })
@@ -40,6 +40,7 @@ export class UpdateUserDto extends UpdateProfileDto {
 export class BanUserDto {
   @ApiProperty({ default: false })
   @IsBoolean()
+  @IsNotEmpty()
   isBanned: boolean;
 }
 
@@ -47,6 +48,20 @@ export class UserAvatarUpdateDto {
   @ApiProperty({
     type: 'file',
     description: 'Max size : 5MB per file, Only Accept Image File',
+    required: true,
   })
   file: Express.Multer.File;
+}
+
+export class UserCreditsUpdateDto {
+  @ApiProperty({ default: 0 })
+  @IsNumber()
+  @IsNotEmpty()
+  amount: number;
+}
+export class UserActiveByCodeDto {
+  @ApiProperty({ default: '' })
+  @IsString()
+  @IsNotEmpty()
+  verifyCode: string;
 }

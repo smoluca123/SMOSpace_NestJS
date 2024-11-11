@@ -1,19 +1,29 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { handleDefaultError } from 'src/global/functions.global';
+import {
+  generateSecureVerificationCode,
+  handleDefaultError,
+} from 'src/global/functions.global';
 import {
   IDecodedAccecssTokenType,
   IResponseType,
 } from 'src/interfaces/interfaces.global';
 import { userDataSelect, UserDataType } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { BanUserDto, UpdateProfileDto } from 'src/resources/user/dto/user.dto';
-import * as bcrypt from 'bcrypt';
+import {
+  BanUserDto,
+  UpdateProfileDto,
+  UserActiveByCodeDto,
+} from 'src/resources/user/dto/user.dto';
+import * as bcrypt from 'bcryptjs';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from 'src/supabase/supabase.service';
+import { EmailService } from 'src/resources/email/email.service';
+import { addMinutes, isPast } from 'date-fns';
 
 @Injectable()
 export class UserService {
@@ -21,6 +31,7 @@ export class UserService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly supabase: SupabaseService,
+    private readonly emailService: EmailService,
   ) {}
   async getInfomation(
     decodedAccessToken: IDecodedAccecssTokenType,
@@ -185,6 +196,193 @@ export class UserService {
 
       return {
         message: 'Update user avatar successfully',
+        data: updatedUser,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async updateUserCredits(
+    userId: string,
+    data: {
+      credits: number;
+    },
+  ): Promise<
+    IResponseType<{
+      id: string;
+      username: string;
+      credits: number;
+    }>
+  > {
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data,
+        select: { id: true, username: true, credits: true },
+      });
+
+      if (!updatedUser) throw new NotFoundException('User not found');
+
+      return {
+        message: 'Update user credits successfully',
+        data: updatedUser,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async addUserCredits(
+    userId: string,
+    data: {
+      credits: number;
+    },
+  ): Promise<
+    IResponseType<{
+      id: string;
+      username: string;
+      credits: number;
+    }>
+  > {
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          credits: {
+            increment: data.credits,
+          },
+        },
+        select: { id: true, username: true, credits: true },
+      });
+
+      if (!updatedUser) throw new NotFoundException('User not found');
+
+      return {
+        message: 'Add user credits successfully',
+        data: updatedUser,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async sendVerificationEmail(userId: string): Promise<IResponseType> {
+    try {
+      const EXPIRATION_MINUTES = 10;
+      const currentDate = new Date();
+      if (!userId) throw new BadRequestException('User ID is required');
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) throw new NotFoundException('User not found');
+      if (user.isActive)
+        throw new BadRequestException('User is already active');
+
+      // const token = this.jwtService.sign(
+      //   { userId: user.id },
+      //   { expiresIn: '1d' },
+      // );
+
+      // const verificationLink = `${this.configService.get('APP_URL')}/verify-email/${token}`;
+
+      // Generate active code
+      const checkCode = await this.prisma.activeCode.findFirst({
+        where: {
+          userId: user.id,
+        },
+      });
+
+      let activeCode = checkCode?.code || generateSecureVerificationCode();
+
+      if (!checkCode) {
+        await this.prisma.activeCode.create({
+          data: {
+            userId: user.id,
+            code: activeCode,
+            createdAt: currentDate,
+            expiresAt: addMinutes(currentDate, EXPIRATION_MINUTES),
+          },
+        });
+      } else {
+        const isExpired = isPast(new Date(checkCode.expiresAt));
+        if (isExpired) {
+          activeCode = generateSecureVerificationCode();
+          await this.prisma.activeCode.update({
+            where: { id: checkCode.id },
+            data: {
+              code: activeCode,
+              createdAt: currentDate,
+              expiresAt: addMinutes(currentDate, EXPIRATION_MINUTES),
+            },
+          });
+        }
+      }
+
+      await this.emailService.sendActiveAccountEmail({
+        email: user.email,
+        context: {
+          name: user.fullName,
+          verification_code: activeCode, // TODO: Generate verification code
+        },
+      });
+
+      return {
+        message: 'Verification email sent successfully',
+        data: null,
+        statusCode: 204,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async userActiveByCode(
+    userId: string,
+    verificationData: UserActiveByCodeDto,
+  ): Promise<IResponseType<UserDataType>> {
+    try {
+      if (!userId) throw new BadRequestException('User ID is required');
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      if (!user) throw new NotFoundException('User not found');
+      if (user.isActive) throw new ForbiddenException('User is already active');
+
+      const checkCode = await this.prisma.activeCode.findFirst({
+        where: {
+          userId: user.id,
+          code: verificationData.verifyCode,
+        },
+      });
+
+      if (!checkCode) throw new ForbiddenException('Invalid verification code');
+
+      const isExpired = isPast(new Date(checkCode.expiresAt));
+      if (isExpired) throw new ForbiddenException('Verification code expired');
+
+      await this.prisma.activeCode.delete({
+        where: { id: checkCode.id },
+      });
+
+      const updatedUser = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { isActive: true },
+        select: userDataSelect,
+      });
+
+      return {
+        message: 'User activated successfully',
         data: updatedUser,
         statusCode: 200,
         date: new Date(),

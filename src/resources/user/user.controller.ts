@@ -32,6 +32,8 @@ import {
   BanUserDto,
   UpdateProfileDto,
   UpdateUserDto,
+  UserActiveByCodeDto,
+  UserCreditsUpdateDto,
 } from 'src/resources/user/dto/user.dto';
 import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
 
@@ -87,6 +89,34 @@ export class UserController {
     return this.userService.updateUserAvatar(userId, file);
   }
 
+  @Put('/credits/update/:userId')
+  async updateUserCredits(
+    @Param('userId') userId: string,
+    @Body() data: UserCreditsUpdateDto,
+  ): Promise<
+    IResponseType<{
+      id: string;
+      username: string;
+      credits: number;
+    }>
+  > {
+    const { amount } = data;
+    return this.userService.updateUserCredits(userId, {
+      credits: amount,
+    });
+  }
+
+  @Post('/credits/add/:userId')
+  async addUserCredits(
+    @Param('userId') userId: string,
+    @Body() data: UserCreditsUpdateDto,
+  ): Promise<IResponseType> {
+    const { amount } = data;
+    return this.userService.addUserCredits(userId, {
+      credits: amount,
+    });
+  }
+
   @Put('/me')
   @updateInfomationDecorator()
   async updateInfomation(
@@ -108,5 +138,20 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDto,
   ): Promise<IResponseType<UserDataType>> {
     return this.userService.updateUserInfomation(userId, updateUserDto);
+  }
+
+  @Post('/active/send-verification-email/:userId')
+  async sendVerificationEmail(
+    @Param('userId') userId: string,
+  ): Promise<IResponseType> {
+    return this.userService.sendVerificationEmail(userId);
+  }
+
+  @Post('/active/:userId')
+  async userActiveByCode(
+    @Param('userId') userId: string,
+    @Body() verificationData: UserActiveByCodeDto,
+  ): Promise<IResponseType<UserDataType>> {
+    return this.userService.userActiveByCode(userId, verificationData);
   }
 }
