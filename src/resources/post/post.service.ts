@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { handleDefaultError } from 'src/global/functions.global';
 import {
   IDecodedAccecssTokenType,
@@ -11,7 +15,11 @@ import {
   PostDataType,
 } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreatePostDto } from 'src/resources/post/dto/post.dto';
+import {
+  CreatePostDto,
+  UpdatePostAsAdminDto,
+  UpdatePostDto,
+} from 'src/resources/post/dto/post.dto';
 
 @Injectable()
 export class PostService {
@@ -74,6 +82,160 @@ export class PostService {
         message: 'Post created successfully',
         data: post,
         statusCode: 201,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async updatePost({
+    postId,
+    data,
+    decodedAccessToken,
+  }: {
+    postId: string;
+    data: UpdatePostDto;
+    decodedAccessToken: IDecodedAccecssTokenType;
+  }) {
+    try {
+      const { userId } = decodedAccessToken;
+
+      Object.keys(data).forEach((key) => {
+        if (!data[key]) {
+          if (typeof data[key] === 'boolean') {
+            data[key] = data[key] ?? false;
+            return;
+          }
+          data[key] = undefined;
+        }
+      });
+
+      const checkUser = await this.prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+
+      if (!checkUser) throw new NotFoundException('User not found');
+
+      const checkPost = await this.prisma.post.findUnique({
+        where: {
+          id: postId,
+        },
+      });
+      if (!checkPost) throw new NotFoundException('Post not found');
+      if (checkPost.authorId !== userId)
+        throw new ForbiddenException('Unauthorized');
+
+      const updatedPost = await this.prisma.post.update({
+        where: {
+          id: postId,
+        },
+        data,
+        select: postDataSelect,
+      });
+
+      return {
+        message: 'Post updated successfully',
+        data: updatedPost,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async updatePostAsAdmin({
+    postId,
+    data,
+  }: {
+    postId: string;
+    data: UpdatePostAsAdminDto;
+  }): Promise<IResponseType<PostDataType>> {
+    try {
+      Object.keys(data).forEach((key) => {
+        if (!data[key]) {
+          if (typeof data[key] === 'boolean') {
+            data[key] = data[key] ?? false;
+            return;
+          }
+          data[key] = undefined;
+        }
+      });
+      const updatedPost = await this.prisma.post.update({
+        where: {
+          id: postId,
+        },
+        data,
+        select: postDataSelect,
+      });
+      if (!updatedPost) throw new NotFoundException('Post not found');
+
+      return {
+        message: 'Post updated successfully',
+        data: updatedPost,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deletePost({ postId, decodedAccessToken }) {
+    try {
+      const { userId } = decodedAccessToken;
+      const checkUser = await this.prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+
+      if (!checkUser) throw new NotFoundException('User not found');
+
+      const checkPost = await this.prisma.post.findUnique({
+        where: {
+          id: postId,
+        },
+      });
+      if (!checkPost) throw new NotFoundException('Post not found');
+      if (checkPost.authorId !== userId)
+        throw new ForbiddenException('Unauthorized');
+
+      await this.prisma.post.delete({
+        where: {
+          id: postId,
+        },
+      });
+
+      return {
+        message: 'Post deleted successfully',
+        data: null,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deletePostAsAdmin({
+    postId,
+  }: {
+    postId: string;
+  }): Promise<IResponseType<null>> {
+    try {
+      await this.prisma.post.delete({
+        where: {
+          id: postId,
+        },
+      });
+      return {
+        message: 'Post deleted successfully',
+        data: null,
+        statusCode: 200,
         date: new Date(),
       };
     } catch (error) {
