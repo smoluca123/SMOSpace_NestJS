@@ -37,6 +37,7 @@ export const userSessionDataSelect = {
 export const postDataSelect = {
   id: true,
   content: true,
+  isPrivate: true,
   createdAt: true,
   updatedAt: true,
   author: {
