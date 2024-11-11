@@ -11,6 +11,7 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { AuthModule } from 'src/resources/auth/auth.module';
 import { JwtModuleCustom } from 'src/jwt/jwt.module';
 import { UserModule } from 'src/resources/user/user.module';
+import { PostModule } from 'src/resources/post/post.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UserModule } from 'src/resources/user/user.module';
     PrismaModule,
     AuthModule,
     UserModule,
+    PostModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

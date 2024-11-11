@@ -69,6 +69,7 @@ model User {
   userType    UserType      @relation(fields: [type], references: [id], onDelete: Restrict)
   UserSession UserSession[]
   ActiveCode  ActiveCode[]
+  Post        Post[]
 
   @@map("users")
 }
@@ -131,4 +132,17 @@ model ActiveCode {
   user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@map("active_codes")
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  content   String
+  authorId  String
+  isPrivate Boolean  @map("is_private")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@map("posts")
 }

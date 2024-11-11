@@ -33,3 +33,24 @@ export const userSessionDataSelect = {
   id: true,
   expiresAt: true,
 } satisfies Prisma.UserSessionSelect;
+
+export const postDataSelect = {
+  id: true,
+  content: true,
+  createdAt: true,
+  updatedAt: true,
+  author: {
+    select: userDataSelect,
+  },
+} satisfies Prisma.PostSelect;
+
+export const postDataInclude = {
+  author: {
+    select: userDataSelect,
+  },
+} satisfies Prisma.PostInclude;
+
+export type PostDataType = Prisma.PostGetPayload<{
+  select: typeof postDataSelect;
+  // include: typeof postDataInclude;
+}>;
