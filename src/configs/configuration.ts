@@ -1,9 +1,15 @@
+import { envSchema } from './../utils/validations';
 const configuration = () => ({
   SERVER_PORT: parseInt(process.env.SERVER_PORT || '0', 10) || 8080,
-  FRONTEND_URL1: process.env.FRONTEND_URL1 || '',
-  FRONTEND_URL2: process.env.FRONTEND_URL2 || '',
-  FRONTEND_URL3: process.env.FRONTEND_URL3 || '',
-  FRONTEND_URL4: process.env.FRONTEND_URL4 || '',
 });
+
+const validConfig = envSchema.safeParse(configuration());
+
+if (validConfig.error) {
+  throw new Error(validConfig.error.message);
+}
+
+const { data: configData } = validConfig;
+export { configData };
 
 export default configuration;

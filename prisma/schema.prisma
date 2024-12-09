@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearch"]
+  previewFeatures = ["fullTextSearchPostgres"]
 }
 
 datasource db {
@@ -110,7 +110,7 @@ model UserType {
 model UserSession {
   id           String   @id @default(uuid())
   userId       String   @map("user_id")
-  token        String
+  token        String   @unique()
   ipAddress    String?  @map("ip_address")
   userAgent    String?  @map("user_agent")
   payload      String?

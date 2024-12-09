@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { UserDataType } from 'src/libs/prisma-types';
 
 export interface IResponseType<ResultDataType = any> {
   message: string;
@@ -23,7 +24,6 @@ export interface IPaginationResponseType<ResultDataType = any> {
 }
 
 export interface IDecodedAccecssTokenType {
-  sessionId: string;
   userId: string;
   username: string;
   originalToken: string;
@@ -65,3 +65,11 @@ export enum RolesLevel {
   MANAGER = 1,
   ADMIN = 2,
 }
+
+export interface IWithAccessToken {
+  accessToken: string;
+}
+
+export interface IUserDataWithAccessToken
+  extends UserDataType,
+    IWithAccessToken {}
