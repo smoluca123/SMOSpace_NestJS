@@ -10,6 +10,7 @@ import {
 import { Roles } from 'src/decorators/roles.decorator';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 import { RolesLevel } from 'src/interfaces/interfaces.global';
+
 import { UserAvatarUpdateDto } from 'src/resources/user/dto/user.dto';
 
 export const getInfomationDecorator = () =>
@@ -39,7 +40,13 @@ export const getUserInfomationDecorator = () =>
   );
 
 export const banUserDecorator = () =>
-  applyDecorators(Roles([RolesLevel.ADMIN]));
+  applyDecorators(
+    Roles([RolesLevel.ADMIN]),
+    ApiOperation({
+      summary: 'Ban a user (Administrators only)',
+      description: 'Ban a user (Administrators only)',
+    }),
+  );
 
 export const updateInfomationDecorator = () =>
   applyDecorators(

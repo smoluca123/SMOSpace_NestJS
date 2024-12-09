@@ -31,8 +31,16 @@ export type UserDataType = Prisma.UserGetPayload<{
 
 export const userSessionDataSelect = {
   id: true,
+  token: true,
   expiresAt: true,
+  user: {
+    select: userDataSelect,
+  },
 } satisfies Prisma.UserSessionSelect;
+
+export type UserSessionDataType = Prisma.UserSessionGetPayload<{
+  select: typeof userSessionDataSelect;
+}>;
 
 export const postDataSelect = {
   id: true,

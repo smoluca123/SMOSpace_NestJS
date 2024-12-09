@@ -7,13 +7,10 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
-import { RoleGuard } from 'src/guards/role.guard';
 import {
   CreatePostDto,
   UpdatePostAsAdminDto,
@@ -35,7 +32,6 @@ import { PostDataType } from 'src/libs/prisma-types';
 
 @ApiTags('Post Management')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'), RoleGuard)
 @Controller('post')
 export class PostController {
   constructor(private readonly postService: PostService) {}

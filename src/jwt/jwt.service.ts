@@ -12,7 +12,6 @@ export class JwtServiceCustom {
 
   async generateAccessToken(
     payload: {
-      sessionId: string;
       userId: string;
       username: string;
       key?: string;

@@ -43,3 +43,15 @@ export const decoratorsAuthLogout = () =>
       required: true,
     }),
   );
+
+export const decoratorsRenewSession = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Renew Session API',
+      description: 'Renew session API with a access token',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+  );

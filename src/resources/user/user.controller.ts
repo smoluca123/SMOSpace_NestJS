@@ -2,18 +2,15 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   MaxFileSizeValidator,
   Param,
   ParseFilePipe,
   Post,
   Put,
   UploadedFile,
-  UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
-import { UserDataType } from 'src/libs/prisma-types';
+import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   banUserDecorator,
   getInfomationDecorator,
@@ -22,26 +19,24 @@ import {
   updateUserAvatarDecorator,
   updateUserInfomationDecorator,
 } from 'src/resources/user/user.decorators';
-import {
-  IDecodedAccecssTokenType,
-  IResponseType,
-} from 'src/interfaces/interfaces.global';
+import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
-import { AuthGuard } from '@nestjs/passport';
-import { RoleGuard } from 'src/guards/role.guard';
 import {
   BanUserDto,
-  RefreshTokenResponseDto,
   UpdateProfileDto,
   UpdateUserDto,
   UserActiveByCodeDto,
   UserCreditsUpdateDto,
 } from 'src/resources/user/dto/user.dto';
 import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
+import {
+  SendVerificationEmailResponseDto,
+  UpdateAddCreditsUserResponseDto,
+  UserInfomationResponseDto,
+} from 'src/resources/user/dto/Responses.dto';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'), RoleGuard)
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
@@ -50,25 +45,25 @@ export class UserController {
   @getInfomationDecorator()
   async getInfomation(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
-  ): Promise<IResponseType<UserDataType>> {
+  ) {
     return this.userService.getInfomation(decodedAccessToken);
   }
 
   @Get('/:userId')
   @getUserInfomationDecorator()
-  async getUserInfomation(
-    @Param('userId') userId: string,
-  ): Promise<IResponseType<UserDataType>> {
+  async getUserInfomation(@Param('userId') userId: string) {
     return this.userService.getUserInfomation(userId);
   }
 
-  @Post('/ban/:userId')
+  @Put('/ban/:userId')
   @banUserDecorator()
   async banUser(
     @Param('userId') userId: string,
     @Body() banUserData: BanUserDto,
-  ): Promise<IResponseType> {
-    return this.userService.banUser(userId, banUserData);
+  ) {
+    const result = await this.userService.banUser(userId, banUserData);
+
+    return result;
   }
 
   @Post('/avatar/:userId')
@@ -87,21 +82,19 @@ export class UserController {
       }),
     )
     file: Express.Multer.File,
-  ): Promise<IResponseType<UserDataType>> {
+  ) {
     return this.userService.updateUserAvatar(userId, file);
   }
 
   @Put('/credits/update/:userId')
+  @ApiResponse({
+    status: 200,
+    type: UpdateAddCreditsUserResponseDto,
+  })
   async updateUserCredits(
     @Param('userId') userId: string,
     @Body() data: UserCreditsUpdateDto,
-  ): Promise<
-    IResponseType<{
-      id: string;
-      username: string;
-      credits: number;
-    }>
-  > {
+  ) {
     const { amount } = data;
     return this.userService.updateUserCredits(userId, {
       credits: amount,
@@ -109,10 +102,14 @@ export class UserController {
   }
 
   @Post('/credits/add/:userId')
+  @ApiResponse({
+    status: 200,
+    type: UpdateAddCreditsUserResponseDto,
+  })
   async addUserCredits(
     @Param('userId') userId: string,
     @Body() data: UserCreditsUpdateDto,
-  ): Promise<IResponseType> {
+  ) {
     const { amount } = data;
     return this.userService.addUserCredits(userId, {
       credits: amount,
@@ -124,12 +121,8 @@ export class UserController {
   async updateInfomation(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
     @Body() updateProfileDto: UpdateProfileDto,
-  ): Promise<IResponseType<UserDataType>> {
+  ) {
     const userId = decodedAccessToken.userId;
-    // return this.userService.updateInfomation(
-    //   decodedAccessToken,
-    //   updateProfileDto,
-    // );
     return this.userService.updateUserInfomation(userId, updateProfileDto);
   }
 
@@ -138,33 +131,28 @@ export class UserController {
   async updateUserInfomation(
     @Param('userId') userId: string,
     @Body() updateUserDto: UpdateUserDto,
-  ): Promise<IResponseType<UserDataType>> {
+  ) {
     return this.userService.updateUserInfomation(userId, updateUserDto);
   }
 
   @Post('/active/send-verification-email/:userId')
-  async sendVerificationEmail(
-    @Param('userId') userId: string,
-  ): Promise<IResponseType> {
+  @ApiResponse({
+    status: 200,
+    type: SendVerificationEmailResponseDto,
+  })
+  async sendVerificationEmail(@Param('userId') userId: string) {
     return this.userService.sendVerificationEmail(userId);
   }
 
   @Post('/active/:userId')
+  @ApiResponse({
+    status: 200,
+    type: UserInfomationResponseDto,
+  })
   async userActiveByCode(
     @Param('userId') userId: string,
     @Body() verificationData: UserActiveByCodeDto,
-  ): Promise<IResponseType<UserDataType>> {
+  ) {
     return this.userService.userActiveByCode(userId, verificationData);
-  }
-
-  @Post('/refresh-token')
-  @ApiHeader({
-    name: 'accessToken',
-    required: true,
-  })
-  async refreshToken(
-    @Headers('accessToken') accessToken: string,
-  ): Promise<IResponseType<RefreshTokenResponseDto>> {
-    return this.userService.refreshToken(accessToken);
   }
 }

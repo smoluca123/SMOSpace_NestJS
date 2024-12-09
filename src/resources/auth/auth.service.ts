@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -8,40 +10,52 @@ import { handleDefaultError } from 'src/global/functions.global';
 import {
   IDecodedAccecssTokenType,
   IResponseType,
+  IUserDataWithAccessToken,
 } from 'src/interfaces/interfaces.global';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UserLoginDto } from 'src/resources/auth/dto/UserLogin.dto';
 import * as bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
-import { ConfigService } from '@nestjs/config';
+import { v4 as uuidv4, v4 } from 'uuid';
 
 import { UserRegisterDto } from 'src/resources/auth/dto/UserRegister.dto';
 import { JwtServiceCustom } from 'src/jwt/jwt.service';
-import { JwtService } from '@nestjs/jwt';
-import { HttpService } from '@nestjs/axios';
+
 import {
   userDataSelect,
   UserDataType,
-  userTypeDataSelect,
+  userSessionDataSelect,
+  UserSessionDataType,
 } from 'src/libs/prisma-types';
 import { UserSession } from '@prisma/client';
-import { fromUnixTime } from 'date-fns';
+import { addDays, isPast } from 'date-fns';
+import { Response } from 'express';
+import { AUTH_CONSTANTS } from 'src/resources/auth/auth.constants';
+import { JwtService } from '@nestjs/jwt';
 // import { Response } from 'express';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-    private readonly jwtCustom: JwtServiceCustom,
     private readonly jwt: JwtService,
-    private readonly httpService: HttpService,
+    private readonly jwtCustom: JwtServiceCustom,
   ) {}
-  async authLogin(
-    credentials: UserLoginDto,
-    userAgent: string,
-    ipAddress: string,
-  ): Promise<IResponseType<UserDataType & { accessToken: string }>> {
+  async authLogin({
+    credentials,
+    userAgent,
+    ipAddress,
+  }: {
+    credentials: UserLoginDto;
+    userAgent: string;
+    ipAddress: string;
+    response: Response;
+  }): Promise<
+    IResponseType<
+      UserDataType & {
+        accessToken: string;
+      }
+    >
+  > {
     try {
       const { username, password } = credentials;
 
@@ -60,32 +74,6 @@ export class AuthService {
       if (!isMatchPassword)
         throw new UnauthorizedException('Incorrect password');
 
-      // Generate JWT
-      const key = uuidv4();
-      const sessionId = uuidv4();
-      const accessToken = await this.jwtCustom.generateAccessToken({
-        sessionId,
-        userId: checkUser.id,
-        username: checkUser.username,
-        key,
-      });
-      const refreshToken = await this.jwtCustom.generateAccessToken(
-        {
-          sessionId,
-          userId: checkUser.id,
-          username: checkUser.username,
-          key,
-        },
-        { isRefreshToken: true },
-      );
-
-      await this.prisma.user.update({
-        where: { id: checkUser.id },
-        data: {
-          refreshToken: refreshToken,
-        },
-      });
-
       /* eslint-disable @typescript-eslint/no-unused-vars*/
       const {
         refreshToken: _rfToken,
@@ -95,12 +83,27 @@ export class AuthService {
       } = checkUser;
       /* eslint-enable @typescript-eslint/no-unused-vars*/
 
-      // Set the session
+      // Generate JWT
+      const { accessToken, refreshToken } = await this.generateAuthTokens({
+        user: checkUser,
+      });
+
+      // Update user record with refresh token after registration
+      // This allows the user to maintain their session and perform authenticated requests
+      // The refresh token is used to generate new access tokens when they expire
+      await this.prisma.user.update({
+        where: { id: checkUser.id },
+        data: {
+          refreshToken,
+        },
+      });
+
+      // Set auth session
       await this.setAuthSession({
-        sessionId,
         accessToken,
-        userAgent,
         ipAddress,
+        userAgent,
+        userData: checkUser,
       });
 
       return {
@@ -118,7 +121,13 @@ export class AuthService {
     credentials: UserRegisterDto,
     userAgent: string,
     ipAddress: string,
-  ): Promise<IResponseType<UserDataType & { accessToken: string }>> {
+  ): Promise<
+    IResponseType<
+      UserDataType & {
+        accessToken: string;
+      }
+    >
+  > {
     try {
       const {
         username,
@@ -137,35 +146,9 @@ export class AuthService {
       if (checkUser && email === checkUser?.email)
         throw new ConflictException('Email already exists');
 
-      //   Generate JWT
-      const userId = uuidv4();
-      const key = uuidv4();
-      const sessionId = uuidv4();
-      const accessToken = await this.jwtCustom.generateAccessToken({
-        sessionId,
-        userId,
-        username,
-        key,
-      });
-      const refreshToken = await this.jwtCustom.generateAccessToken(
-        {
-          sessionId,
-          userId,
-          username,
-          key,
-        },
-        { isRefreshToken: true },
-      );
-
       /*   eslint-disable @typescript-eslint/no-unused-vars */
-      const {
-        password: _pw,
-        refreshToken: _rfToken,
-        type,
-        ...resultUser
-      } = await this.prisma.user.create({
+      const createdUser = await this.prisma.user.create({
         data: {
-          id: userId,
           username,
           email,
           age,
@@ -173,34 +156,44 @@ export class AuthService {
           fullName,
           password: await bcrypt.hash(password, 10),
           phoneNumber,
-          refreshToken,
           isActive: false,
           createdAt: new Date(),
           userType: {
             connect: {
-              id: '588b1a65-426a-468c-9365-dc1c9b851a79',
+              id: AUTH_CONSTANTS.DEFAULT_USER_TYPE_ID,
             },
           },
         },
-        include: {
-          userType: {
-            select: userTypeDataSelect,
-          },
-        },
+        select: userDataSelect,
       });
       /*   eslint-enable @typescript-eslint/no-unused-vars*/
 
+      // Generate JWT
+      const { accessToken, refreshToken } = await this.generateAuthTokens({
+        user: createdUser,
+      });
+
+      // Update user record with refresh token after registration
+      // This allows the user to maintain their session and perform authenticated requests
+      // The refresh token is used to generate new access tokens when they expire
+      await this.prisma.user.update({
+        where: { id: createdUser.id },
+        data: {
+          refreshToken,
+        },
+      });
+
       // Set the session
       await this.setAuthSession({
-        sessionId,
         accessToken,
+        userData: createdUser,
         userAgent,
         ipAddress,
       });
 
       return {
         message: 'User registered successfully',
-        data: { ...resultUser, accessToken },
+        data: { ...createdUser, accessToken },
         statusCode: 201,
         date: new Date(),
       };
@@ -213,7 +206,7 @@ export class AuthService {
     decodedAccessToken: IDecodedAccecssTokenType,
   ): Promise<IResponseType> {
     try {
-      const { userId, sessionId } = decodedAccessToken;
+      const { userId, originalToken } = decodedAccessToken;
 
       await this.prisma.user.update({
         where: { id: userId },
@@ -221,7 +214,9 @@ export class AuthService {
       });
 
       // Delete session
-      await this.removeAuthSession(sessionId);
+      await this.removeAuthSession({
+        accessToken: originalToken,
+      });
 
       return {
         message: 'Logged out successfully',
@@ -237,24 +232,119 @@ export class AuthService {
   async authValidateSession(
     decodedAccessToken: IDecodedAccecssTokenType,
   ): Promise<
-    IResponseType<{ id: string; expiresAt: Date; user: UserDataType }>
+    IResponseType<
+      Omit<UserSessionDataType, 'token'> & {
+        user: IUserDataWithAccessToken;
+      }
+    >
   > {
     try {
-      const sessionResult = await this.prisma.userSession.findUnique({
-        where: { id: decodedAccessToken.sessionId },
-        select: { id: true, expiresAt: true, user: { select: userDataSelect } },
-      });
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { token, user, ...sessionResult } =
+        await this.prisma.userSession.findUnique({
+          where: { token: decodedAccessToken.originalToken },
+          select: userSessionDataSelect,
+        });
 
-      if (
-        !sessionResult ||
-        sessionResult.user.id !== decodedAccessToken.userId
-      ) {
+      if (!sessionResult || user.id !== decodedAccessToken.userId) {
         throw new UnauthorizedException('Invalid session or expired session');
       }
 
+      user['accessToken'] = decodedAccessToken.originalToken;
+
       return {
         message: 'Session is available',
-        data: sessionResult,
+        data: {
+          ...sessionResult,
+          user: user as IUserDataWithAccessToken,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  /**
+   * Renew user's login session
+   * @param oldAccessToken - Old token that needs to be renewed
+   * @returns New session information of the user
+   */
+  async renewSession(oldAccessToken: string): Promise<
+    IResponseType<
+      Omit<UserSessionDataType, 'token'> & {
+        user: IUserDataWithAccessToken;
+      }
+    >
+  > {
+    try {
+      if (!oldAccessToken)
+        throw new BadRequestException('Access token is required');
+
+      // Get current timestamp
+      const currentDate = new Date();
+
+      // Check if old session exists
+      const checkSession = await this.prisma.userSession.findUnique({
+        where: { token: oldAccessToken },
+      });
+
+      // Decode old token to get user information
+      const { userId, username } = await this.jwt.verifyAsync<
+        Omit<IDecodedAccecssTokenType, 'originalToken'>
+      >(oldAccessToken, {
+        ignoreExpiration: true,
+      });
+
+      // Validate session
+      if (!checkSession || checkSession.userId !== userId)
+        throw new ForbiddenException('Invalid session');
+      if (isPast(new Date(checkSession.expiresAt)))
+        throw new ForbiddenException('Session expired');
+
+      // Generate new key for token
+      const key = v4();
+
+      // Generate new access token and refresh token
+      const accessToken = await this.jwtCustom.generateAccessToken({
+        userId,
+        username,
+        key,
+      });
+      const refreshToken = await this.jwtCustom.generateAccessToken(
+        { userId, username, key },
+        { isRefreshToken: true },
+      );
+
+      // Update user with new refresh token
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { refreshToken },
+      });
+
+      // Update session with new token
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { token, user, ...newSession } =
+        await this.prisma.userSession.update({
+          where: { token: oldAccessToken },
+          data: {
+            token: accessToken,
+            expiresAt: addDays(currentDate, AUTH_CONSTANTS.SESSION_EXPIRES),
+          },
+          select: userSessionDataSelect,
+        });
+
+      // Add access token to user information
+      user['accessToken'] = accessToken;
+
+      // Return result
+      return {
+        message: 'Refresh token successfully generated',
+        data: {
+          ...newSession,
+          user: user as IUserDataWithAccessToken,
+        },
         statusCode: 200,
         date: new Date(),
       };
@@ -265,55 +355,50 @@ export class AuthService {
 
   //   ----------------- Utils
   async setAuthSession({
-    sessionId,
     accessToken,
+    userData,
     ipAddress,
     userAgent,
     payload,
   }: {
-    sessionId: string;
     accessToken: string;
+    userData: UserDataType;
     userAgent: string;
     ipAddress: string;
     payload?: JSON;
   }): Promise<IResponseType<UserSession>> {
     try {
-      const { exp, userId } = this.jwt.verify(
-        accessToken,
-      ) as IDecodedAccecssTokenType;
-      const currentDate = new Date();
-      const expiresAt = fromUnixTime(+exp);
-
       const checkUserSession = await this.prisma.userSession.findFirst({
         where: {
           AND: {
-            userId: userId,
+            userId: userData.id,
             userAgent: userAgent,
           },
         },
         include: { user: true },
       });
 
+      const currentDate = new Date();
+      const expiresAt = addDays(currentDate, AUTH_CONSTANTS.SESSION_EXPIRES); // 24 hours
+
       const userSession = await this.prisma.userSession.upsert({
         where: {
           id: checkUserSession?.id || '',
         },
         create: {
-          id: sessionId,
-          ipAddress: ipAddress,
           token: accessToken,
-          createdAt: currentDate,
+          ipAddress,
           expiresAt,
           lastActivity: currentDate,
-          userId: userId,
+          userId: userData.id,
           userAgent: userAgent,
           payload: JSON.stringify(payload),
         },
         update: {
-          id: sessionId,
+          token: accessToken,
+          ipAddress,
           lastActivity: currentDate,
           expiresAt,
-          token: accessToken,
           payload: JSON.stringify(payload),
         },
         include: {
@@ -323,29 +408,6 @@ export class AuthService {
         },
       });
 
-      // if (!checkUserSession) {
-      //   sessionResult = await this.prisma.userSession.create({
-      //     data: {
-      //       ipAddress: ipAddress,
-      //       token: accessToken,
-      //       createdAt: currentDate,
-      //       expiresAt: new Date(exp),
-      //       lastActivity: currentDate,
-      //       userId: userId,
-      //       userAgent: userAgent,
-      //       payload: JSON.stringify(payload),
-      //     },
-      //   });
-      // } else {
-      //   sessionResult = await this.prisma.userSession.update({
-      //     where: { id: checkUserSession.id },
-      //     data: {
-      //       lastActivity: currentDate,
-      //       token: accessToken,
-      //       payload: JSON.stringify(payload),
-      //     },
-      //   });
-      // }
       return {
         message: 'Set session successfully',
         data: {
@@ -359,10 +421,14 @@ export class AuthService {
     }
   }
 
-  async removeAuthSession(sessionId: string): Promise<IResponseType> {
+  async removeAuthSession({
+    accessToken,
+  }: {
+    accessToken: string;
+  }): Promise<IResponseType> {
     try {
       await this.prisma.userSession.delete({
-        where: { id: sessionId },
+        where: { token: accessToken },
       });
 
       return {
@@ -370,6 +436,35 @@ export class AuthService {
         data: null,
         statusCode: 204,
         date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async generateAuthTokens({ user }: { user: UserDataType }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    try {
+      const key = uuidv4();
+      const accessToken = await this.jwtCustom.generateAccessToken({
+        userId: user.id,
+        username: user.username,
+        key,
+      });
+      const refreshToken = await this.jwtCustom.generateAccessToken(
+        {
+          userId: user.id,
+          username: user.username,
+          key,
+        },
+        { isRefreshToken: true },
+      );
+
+      return {
+        accessToken,
+        refreshToken,
       };
     } catch (error) {
       handleDefaultError(error);
