@@ -9,7 +9,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { PostService } from './post.service';
-import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CreatePostDto,
@@ -20,6 +19,7 @@ import {
   createPostDecorator,
   deletePostAsAdminDecorator,
   deletePostDecorator,
+  getPostsDecorator,
   updatePostAsAdminDecorator,
   updatePostDecorator,
 } from 'src/resources/post/post.decorators';
@@ -37,11 +37,16 @@ export class PostController {
   constructor(private readonly postService: PostService) {}
 
   @Get()
-  @ApiQueryLimitAndPage()
-  getPosts(@Query('limit') limit: number, @Query('page') page: number) {
+  @getPostsDecorator()
+  getPosts(
+    @Query('limit') limit: number,
+    @Query('page') page: number,
+    @Query('keywords') keywords: string,
+  ) {
     const initLimit = +limit || 10;
     const initPage = +page || 1;
     return this.postService.getPosts({
+      keywords,
       limit: initLimit,
       page: initPage,
     });

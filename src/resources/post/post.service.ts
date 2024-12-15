@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { handleDefaultError } from 'src/global/functions.global';
 import {
   IDecodedAccecssTokenType,
@@ -25,26 +26,47 @@ import {
 export class PostService {
   constructor(private readonly prisma: PrismaService) {}
   async getPosts({
+    keywords = '',
     limit,
     page,
   }: {
+    keywords: string;
     limit: number;
     page: number;
   }): Promise<IPaginationResponseType<PostDataType>> {
     try {
-      const posts = await this.prisma.post.findMany({
-        where: {
-          isPrivate: false,
-        },
-        take: limit,
-        skip: (page - 1) * limit,
-        include: postDataInclude,
-      });
+      const whereQuery: Prisma.PostWhereInput = {
+        isPrivate: false,
+        OR: [
+          {
+            content: {
+              contains: keywords,
+              mode: 'insensitive',
+            },
+          },
+          {
+            content: {
+              search: keywords,
+              mode: 'insensitive',
+            },
+          },
+        ],
+      };
 
-      const totalCount = await this.prisma.post.count();
+      const [totalCount, posts] = await this.prisma.$transaction([
+        this.prisma.post.count({ where: whereQuery }),
+        this.prisma.post.findMany({
+          where: whereQuery,
+          take: limit,
+          skip: (page - 1) * limit,
+          include: postDataInclude,
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
+
       const totalPage = Math.ceil(totalCount / limit);
       const hasNextPage = page * limit < totalCount;
-      const hasPreviousPage = page > 1;
+      const hasPreviousPage = !!totalCount && page > 1;
 
       return {
         message: 'Posts fetched successfully',

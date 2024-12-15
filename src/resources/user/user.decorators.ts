@@ -6,12 +6,27 @@ import {
   ApiHeader,
   ApiOperation,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
+import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { Roles } from 'src/decorators/roles.decorator';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 import { RolesLevel } from 'src/interfaces/interfaces.global';
 
 import { UserAvatarUpdateDto } from 'src/resources/user/dto/user.dto';
+
+export const getAllUsersDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get all users API',
+      description: 'Get all users API',
+    }),
+    ApiQueryLimitAndPage(),
+    ApiQuery({
+      name: 'keywords',
+      required: false,
+    }),
+  );
 
 export const getInfomationDecorator = () =>
   applyDecorators(

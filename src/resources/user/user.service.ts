@@ -10,6 +10,7 @@ import {
 } from 'src/global/functions.global';
 import {
   IDecodedAccecssTokenType,
+  IPaginationResponseType,
   IResponseType,
 } from 'src/interfaces/interfaces.global';
 import { userDataSelect, UserDataType } from 'src/libs/prisma-types';
@@ -26,6 +27,7 @@ import { EmailService } from 'src/resources/email/email.service';
 import { addMinutes, isPast } from 'date-fns';
 import { JwtServiceCustom } from 'src/jwt/jwt.service';
 import { JwtService } from '@nestjs/jwt';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UserService {
@@ -37,6 +39,75 @@ export class UserService {
     private readonly jwt: JwtService,
     private readonly customJwt: JwtServiceCustom,
   ) {}
+
+  /**
+   * Gets all users with pagination and search functionality
+   *
+   * @param keywords Optional search term to filter users by username, email, fullName or displayName
+   * @param limit Optional number of users per page (default: 10)
+   * @param page Optional page number (default: 1)
+   * @returns Promise containing paginated user data and metadata
+   */
+  async getAllUsers({
+    keywords = '',
+    limit = 10,
+    page = 1,
+  }: {
+    keywords?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<IPaginationResponseType<UserDataType>> {
+    try {
+      // Build where query to search across multiple user fields
+      const whereQuery: Prisma.UserWhereInput = {
+        OR: [
+          { username: { contains: keywords } },
+          { email: { contains: keywords } },
+          { fullName: { contains: keywords } },
+          { displayName: { contains: keywords } },
+        ],
+      };
+
+      // Execute count and find queries in a transaction for consistency
+      const [totalCount, users] = await this.prisma.$transaction([
+        // Get total count of matching users
+        this.prisma.user.count({ where: whereQuery }),
+        // Get paginated users with ordering
+        this.prisma.user.findMany({
+          where: whereQuery,
+          skip: (page - 1) * limit, // Calculate offset
+          take: limit,
+          orderBy: {
+            createdAt: 'desc', // Sort by newest first
+          },
+          select: userDataSelect,
+        }),
+      ]);
+
+      // Calculate pagination metadata
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPage;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      // Return formatted response
+      return {
+        message: 'Get all users successfully',
+        data: {
+          currentPage: page,
+          totalCount,
+          totalPage,
+          pageSize: limit,
+          hasNextPage,
+          hasPreviousPage,
+          items: users,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
 
   /**
    * Retrieves user information based on the decoded access token.
