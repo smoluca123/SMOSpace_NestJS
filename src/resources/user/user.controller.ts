@@ -7,12 +7,14 @@ import {
   ParseFilePipe,
   Post,
   Put,
+  Query,
   UploadedFile,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   banUserDecorator,
+  getAllUsersDecorator,
   getInfomationDecorator,
   getUserInfomationDecorator,
   updateInfomationDecorator,
@@ -40,6 +42,20 @@ import {
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  @Get('/')
+  @getAllUsersDecorator()
+  async getAllUsers(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('keywords') keywords: string,
+  ) {
+    return this.userService.getAllUsers({
+      keywords,
+      limit: +limit,
+      page: +page,
+    });
+  }
 
   @Get('/me')
   @getInfomationDecorator()

@@ -1,12 +1,30 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { Roles } from 'src/decorators/roles.decorator';
 import { RolesLevel } from 'src/global/enums.global';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 
+export const getPostsDecorator = () =>
+  applyDecorators(
+    ApiQueryLimitAndPage(),
+    ApiOperation({
+      summary: 'Get all posts',
+      description: 'Get all posts API',
+    }),
+    ApiQuery({
+      name: 'keywords',
+      required: false,
+    }),
+  );
+
 export const createPostDecorator = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),
+    ApiOperation({
+      summary: 'Create a post',
+      description: 'Create a post API',
+    }),
     ApiHeader({
       name: 'accessToken',
       required: true,
