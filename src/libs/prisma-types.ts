@@ -51,6 +51,7 @@ export const postDataSelect = {
   author: {
     select: userDataSelect,
   },
+  likeCount: true,
 } satisfies Prisma.PostSelect;
 
 export const postDataInclude = {
@@ -59,7 +60,29 @@ export const postDataInclude = {
   },
 } satisfies Prisma.PostInclude;
 
+export const postLikeDataSelect = {
+  id: true,
+  // userId: true,
+  // postId: true,
+  createdAt: true,
+  user: {
+    select: userDataSelect,
+  },
+  post: {
+    select: postDataSelect,
+  },
+} satisfies Prisma.PostLikeSelect;
+
 export type PostDataType = Prisma.PostGetPayload<{
   select: typeof postDataSelect;
   // include: typeof postDataInclude;
 }>;
+
+export type PostLikeDataType = Prisma.PostLikeGetPayload<{
+  select: typeof postLikeDataSelect;
+}>;
+
+export type TrendingTopicType = {
+  hashtag: string;
+  count: number;
+};

@@ -15,6 +15,8 @@ export class PostDataResponseDto implements PostDataType {
   createdAt: Date;
   @ApiProperty()
   updatedAt: Date;
+  @ApiProperty()
+  likeCount: number;
 
   @ApiProperty({
     type: UserDataResponseDto,

@@ -1,5 +1,5 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { Roles } from 'src/decorators/roles.decorator';
 import { RolesLevel } from 'src/global/enums.global';
@@ -15,6 +15,50 @@ export const getPostsDecorator = () =>
     ApiQuery({
       name: 'keywords',
       required: false,
+    }),
+  );
+
+export const getPostDecorator = () =>
+  applyDecorators(
+    ApiParam({
+      name: 'postId',
+    }),
+    ApiOperation({
+      summary: 'Get a post',
+      description: 'Get a post API',
+    }),
+  );
+
+export const getTrendingTopicsDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get trending topics',
+      description: 'Get trending topics API',
+    }),
+  );
+
+export const likePostDecorator = () =>
+  applyDecorators(
+    UseGuards(JwtTokenVerifyGuard),
+    ApiOperation({
+      summary: 'Like a post',
+      description: 'Toggle like a post API',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+    ApiParam({
+      name: 'postId',
+    }),
+  );
+
+export const getLikesPostDecorator = () =>
+  applyDecorators(
+    ApiQueryLimitAndPage(),
+    ApiParam({
+      name: 'postId',
+      required: true,
     }),
   );
 
