@@ -320,7 +320,7 @@ export class PostService {
         });
       }
 
-      const isLiked = post.likes.length > 0;
+      const isLiked = post.likes && post.likes.length > 0;
 
       // Tối ưu: Sử dụng 1 transaction duy nhất cho cả like và unlike
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
