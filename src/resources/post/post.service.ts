@@ -304,10 +304,7 @@ export class PostService {
           likes: {
             where: {
               userId: decodedAccessToken.userId,
-            },
-            select: {
-              userId: true,
-            },
+            }
           },
         },
       });
