@@ -19,7 +19,11 @@ import {
   createPostDecorator,
   deletePostAsAdminDecorator,
   deletePostDecorator,
+  getLikesPostDecorator,
+  getPostDecorator,
   getPostsDecorator,
+  getTrendingTopicsDecorator,
+  likePostDecorator,
   updatePostAsAdminDecorator,
   updatePostDecorator,
 } from 'src/resources/post/post.decorators';
@@ -35,6 +39,30 @@ import { PostDataType } from 'src/libs/prisma-types';
 @Controller('post')
 export class PostController {
   constructor(private readonly postService: PostService) {}
+
+  @Get('trending')
+  @getTrendingTopicsDecorator()
+  getTrendingTopics() {
+    return this.postService.getTrendingTopics();
+  }
+
+  @Get(':postId')
+  @getPostDecorator()
+  getPostById(@Param('postId') postId: string) {
+    return this.postService.getPostById({ postId });
+  }
+
+  @Get('get-likes/:postId')
+  @getLikesPostDecorator()
+  getLikesPost(
+    @Param('postId') postId: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+  ) {
+    page = +page || 1;
+    limit = +limit || 10;
+    return this.postService.getLikesPost({ postId, limit, page });
+  }
 
   @Get()
   @getPostsDecorator()
@@ -52,32 +80,28 @@ export class PostController {
     });
   }
 
+  @Post(':postId/like')
+  @likePostDecorator()
+  likePost(
+    @Param('postId') postId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    return this.postService.likePost({
+      postId,
+      decodedAccessToken,
+    });
+  }
+
   @Post()
   @createPostDecorator()
   createPost(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
     @Body() data: CreatePostDto,
   ) {
-    // Implement post creation logic
     return this.postService.createPost(decodedAccessToken, data);
   }
 
-  @Put('/:postId')
-  @updatePostDecorator()
-  updatePost(
-    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
-    @Param('postId') postId: string,
-    @Body() data: UpdatePostDto,
-  ): Promise<IResponseType<PostDataType>> {
-    // Implement post update logic
-    return this.postService.updatePost({
-      postId,
-      data,
-      decodedAccessToken,
-    });
-  }
-
-  @Put('/update/:postId')
+  @Put('admin/:postId')
   @updatePostAsAdminDecorator()
   updatePostAsAdmin(
     @Param('postId') postId: string,
@@ -89,20 +113,34 @@ export class PostController {
     });
   }
 
-  @Delete('/:postId')
+  @Put(':postId')
+  @updatePostDecorator()
+  updatePost(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Param('postId') postId: string,
+    @Body() data: UpdatePostDto,
+  ): Promise<IResponseType<PostDataType>> {
+    return this.postService.updatePost({
+      postId,
+      data,
+      decodedAccessToken,
+    });
+  }
+
+  @Delete('admin/:postId')
+  @deletePostAsAdminDecorator()
+  deletePostAsAdmin(
+    @Param('postId') postId: string,
+  ): Promise<IResponseType<PostDataType>> {
+    return this.postService.deletePostAsAdmin({ postId });
+  }
+
+  @Delete(':postId')
   @deletePostDecorator()
   deletePost(
     @Param('postId') postId: string,
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
   ) {
     return this.postService.deletePost({ postId, decodedAccessToken });
-  }
-
-  @Delete('/delete/:postId')
-  @deletePostAsAdminDecorator()
-  deletePostAsAdmin(
-    @Param('postId') postId: string,
-  ): Promise<IResponseType<PostDataType>> {
-    return this.postService.deletePostAsAdmin({ postId });
   }
 }

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -14,6 +15,10 @@ import {
   postDataInclude,
   postDataSelect,
   PostDataType,
+  PostLikeDataType,
+  TrendingTopicType,
+  userDataSelect,
+  // TrendingTopicType,
 } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
@@ -87,6 +92,165 @@ export class PostService {
     }
   }
 
+  async getPostById({
+    postId,
+  }: {
+    postId: string;
+  }): Promise<IResponseType<PostDataType>> {
+    try {
+      if (!postId) {
+        throw new BadRequestException({
+          message: 'Post id is required',
+          statusCode: 400,
+          date: new Date(),
+        });
+      }
+
+      const post = await this.prisma.post.findUnique({
+        where: { id: postId },
+        select: postDataSelect,
+      });
+
+      if (!post) {
+        throw new NotFoundException({
+          message: 'Post not found',
+          statusCode: 404,
+          date: new Date(),
+        });
+      }
+      return {
+        message: 'Post fetched successfully',
+        data: post,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getLikesPost({
+    postId,
+    limit,
+    page,
+  }: {
+    postId: string;
+    page: number;
+    limit: number;
+  }): Promise<
+    IPaginationResponseType<Omit<PostLikeDataType, 'post'>> & {
+      data: {
+        post: PostDataType;
+      };
+    }
+  > {
+    try {
+      if (!postId) {
+        throw new BadRequestException({
+          message: 'Post id is required',
+          statusCode: 400,
+          date: new Date(),
+        });
+      }
+
+      const post = await this.prisma.post.findUnique({
+        where: {
+          id: postId,
+        },
+        select: postDataSelect,
+      });
+      if (!post) {
+        throw new NotFoundException({
+          message: 'Post not found',
+          statusCode: 404,
+          date: new Date(),
+        });
+      }
+
+      const [likes, totalCount] = await this.prisma.$transaction([
+        this.prisma.postLike.findMany({
+          where: {
+            postId,
+          },
+          take: limit,
+          skip: (page - 1) * limit,
+          orderBy: { createdAt: 'desc' },
+
+          select: {
+            id: true,
+            createdAt: true,
+            user: {
+              select: userDataSelect,
+            },
+          },
+        }),
+        this.prisma.postLike.count({
+          where: {
+            postId,
+          },
+        }),
+      ]);
+
+      const currentPage = page;
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page * limit < totalCount;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      return {
+        message: 'Likes fetched successfully',
+        data: {
+          items: likes,
+          post,
+          currentPage,
+          totalPage,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          pageSize: limit,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getTrendingTopics() {
+    try {
+      if (!(await this.prisma.post.count())) {
+        return {
+          message: 'No topics found',
+          data: [],
+          statusCode: 200,
+          date: new Date(),
+        };
+      }
+
+      const result = await this.prisma.$queryRaw<TrendingTopicType[]>`
+        SELECT LOWER(unnest(regexp_matches(content, '#[[:alnum:]_'']+', 'g'))) AS hashtag, COUNT(*) AS count
+        FROM posts
+        GROUP BY (hashtag)
+        ORDER BY count DESC, hashtag ASC
+        LIMIT 5;
+      `;
+
+      const topics = result.map((row) => ({
+        hashtag: row.hashtag,
+        count: Number(row.count),
+      }));
+
+      return {
+        message: 'Trending topics fetched successfully',
+        data: topics,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   async createPost(
     decodedAccessToken: IDecodedAccecssTokenType,
     data: CreatePostDto,
@@ -104,6 +268,94 @@ export class PostService {
         message: 'Post created successfully',
         data: post,
         statusCode: 201,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async likePost({
+    postId,
+    decodedAccessToken,
+  }: {
+    postId: string;
+    decodedAccessToken: IDecodedAccecssTokenType;
+  }): Promise<
+    IResponseType<{
+      isLiked: boolean;
+      post: PostDataType;
+    }>
+  > {
+    try {
+      if (!postId) {
+        throw new BadRequestException({
+          message: 'Post id is required',
+          statusCode: 400,
+          date: new Date(),
+        });
+      }
+
+      // Tối ưu: Chỉ lấy các trường cần thiết và kiểm tra like trong 1 query
+      const post = await this.prisma.post.findUnique({
+        where: { id: postId },
+        select: {
+          ...postDataSelect,
+          likes: {
+            where: {
+              userId: decodedAccessToken.userId,
+            },
+            select: {
+              userId: true,
+            },
+          },
+        },
+      });
+
+      if (!post) {
+        throw new NotFoundException({
+          message: 'Post not found',
+          statusCode: 404,
+          date: new Date(),
+        });
+      }
+
+      const isLiked = post.likes.length > 0;
+
+      // Tối ưu: Sử dụng 1 transaction duy nhất cho cả like và unlike
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const [_, updatedPost] = await this.prisma.$transaction([
+        isLiked
+          ? this.prisma.postLike.delete({
+              where: {
+                postId: postId,
+                userId: decodedAccessToken.userId,
+              },
+            })
+          : this.prisma.postLike.create({
+              data: {
+                postId,
+                userId: decodedAccessToken.userId,
+              },
+            }),
+        this.prisma.post.update({
+          where: { id: postId },
+          data: {
+            likeCount: {
+              [isLiked ? 'decrement' : 'increment']: 1,
+            },
+          },
+          select: postDataSelect,
+        }),
+      ]);
+
+      return {
+        message: 'Post liked/unliked successfully',
+        data: {
+          isLiked: !isLiked,
+          post: updatedPost,
+        },
+        statusCode: 200,
         date: new Date(),
       };
     } catch (error) {
