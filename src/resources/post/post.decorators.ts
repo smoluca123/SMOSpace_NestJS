@@ -64,6 +64,10 @@ export const getLikesPostDecorator = () =>
       name: 'postId',
       required: true,
     }),
+    ApiQuery({
+      name: 'userId',
+      required: false,
+    }),
   );
 
 export const createPostDecorator = () =>
