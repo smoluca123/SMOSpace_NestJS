@@ -16,6 +16,10 @@ export const getPostsDecorator = () =>
       name: 'keywords',
       required: false,
     }),
+    ApiQuery({
+      name: 'userId',
+      required: false,
+    }),
   );
 
 export const getPostDecorator = () =>
