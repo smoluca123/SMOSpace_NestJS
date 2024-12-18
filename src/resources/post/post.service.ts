@@ -150,10 +150,12 @@ export class PostService {
     postId,
     limit,
     page,
+    userId,
   }: {
     postId: string;
     page: number;
     limit: number;
+    userId?: string;
   }): Promise<
     IPaginationResponseType<Omit<PostLikeDataType, 'post'>> & {
       data: {
@@ -184,11 +186,15 @@ export class PostService {
         });
       }
 
+      const whereQuery: Prisma.PostLikeWhereInput = {
+        postId,
+        userId: userId || undefined,
+        // OR: [{ userId: userId || undefined }],
+      };
+
       const [likes, totalCount] = await this.prisma.$transaction([
         this.prisma.postLike.findMany({
-          where: {
-            postId,
-          },
+          where: whereQuery,
           take: limit,
           skip: (page - 1) * limit,
           orderBy: { createdAt: 'desc' },
@@ -202,9 +208,7 @@ export class PostService {
           },
         }),
         this.prisma.postLike.count({
-          where: {
-            postId,
-          },
+          where: whereQuery,
         }),
       ]);
 
@@ -216,8 +220,8 @@ export class PostService {
       return {
         message: 'Likes fetched successfully',
         data: {
-          items: likes,
           post,
+          items: likes,
           currentPage,
           totalPage,
           totalCount,

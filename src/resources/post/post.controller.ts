@@ -58,10 +58,11 @@ export class PostController {
     @Param('postId') postId: string,
     @Query('page') page: number,
     @Query('limit') limit: number,
+    @Query('userId') userId: string,
   ) {
     page = +page || 1;
     limit = +limit || 10;
-    return this.postService.getLikesPost({ postId, limit, page });
+    return this.postService.getLikesPost({ postId, limit, page, userId });
   }
 
   @Get()
