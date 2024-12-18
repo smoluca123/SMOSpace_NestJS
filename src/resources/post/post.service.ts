@@ -34,10 +34,12 @@ export class PostService {
     keywords = '',
     limit,
     page,
+    userId,
   }: {
-    keywords: string;
+    keywords?: string;
     limit: number;
     page: number;
+    userId?: string;
   }): Promise<IPaginationResponseType<PostDataType>> {
     try {
       const whereQuery: Prisma.PostWhereInput = {
@@ -64,10 +66,25 @@ export class PostService {
           where: whereQuery,
           take: limit,
           skip: (page - 1) * limit,
-          include: postDataInclude,
+          include: {
+            ...postDataInclude,
+            likes: {
+              where: {
+                userId: userId || '',
+              },
+              select: {
+                userId: true,
+              },
+            },
+          },
           orderBy: { createdAt: 'desc' },
         }),
       ]);
+
+      const postsWithLikeStatus = posts.map(({ likes, ...post }) => ({
+        ...post,
+        isLiked: likes.length > 0,
+      }));
 
       const totalPage = Math.ceil(totalCount / limit);
       const hasNextPage = page * limit < totalCount;
@@ -76,7 +93,7 @@ export class PostService {
       return {
         message: 'Posts fetched successfully',
         data: {
-          items: posts,
+          items: postsWithLikeStatus,
           totalCount,
           totalPage,
           currentPage: page,
@@ -305,6 +322,9 @@ export class PostService {
             where: {
               userId: decodedAccessToken.userId,
             },
+            select: {
+              userId: true,
+            },
           },
         },
       });
@@ -324,7 +344,7 @@ export class PostService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const [_, updatedPost] = await this.prisma.$transaction([
         isLiked
-          ? this.prisma.postLike.delete({
+          ? this.prisma.postLike.deleteMany({
               where: {
                 postId: postId,
                 userId: decodedAccessToken.userId,

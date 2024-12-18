@@ -70,6 +70,7 @@ export class PostController {
     @Query('limit') limit: number,
     @Query('page') page: number,
     @Query('keywords') keywords: string,
+    @Query('userId') userId: string,
   ) {
     const initLimit = +limit || 10;
     const initPage = +page || 1;
@@ -77,10 +78,11 @@ export class PostController {
       keywords,
       limit: initLimit,
       page: initPage,
+      userId,
     });
   }
 
-  @Post(':postId/like')
+  @Post('/like/:postId')
   @likePostDecorator()
   likePost(
     @Param('postId') postId: string,

@@ -152,8 +152,8 @@ model Post {
 
 model PostLike {
   id        String   @id @default(uuid())
-  userId    String   @unique
-  postId    String   @unique
+  userId    String
+  postId    String
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
