@@ -298,12 +298,7 @@ export class PostService {
   }: {
     postId: string;
     decodedAccessToken: IDecodedAccecssTokenType;
-  }): Promise<
-    IResponseType<{
-      isLiked: boolean;
-      post: PostDataType;
-    }>
-  > {
+  }): Promise<IResponseType<PostDataType & { isLiked: boolean }>> {
     try {
       if (!postId) {
         throw new BadRequestException({
@@ -369,10 +364,7 @@ export class PostService {
 
       return {
         message: 'Post liked/unliked successfully',
-        data: {
-          isLiked: !isLiked,
-          post: updatedPost,
-        },
+        data: { ...updatedPost, isLiked: !isLiked },
         statusCode: 200,
         date: new Date(),
       };
