@@ -16,6 +16,7 @@ import {
   UpdatePostDto,
 } from 'src/resources/post/dto/post.dto';
 import {
+  aiGeneratePostDecorator,
   createPostDecorator,
   deletePostAsAdminDecorator,
   deletePostDecorator,
@@ -33,6 +34,7 @@ import {
   IResponseType,
 } from 'src/interfaces/interfaces.global';
 import { PostDataType } from 'src/libs/prisma-types';
+import { GeneratePostDto } from 'src/resources/post/dto/ai.dto';
 
 @ApiTags('Post Management')
 @ApiBearerAuth()
@@ -80,6 +82,18 @@ export class PostController {
       limit: initLimit,
       page: initPage,
       userId,
+    });
+  }
+
+  @Post('/ai/generate-post')
+  @aiGeneratePostDecorator()
+  aiGeneratePost(
+    @Body() data: GeneratePostDto,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    return this.postService.aiGeneratePost({
+      data,
+      decodedAccessToken,
     });
   }
 
