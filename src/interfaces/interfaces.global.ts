@@ -8,6 +8,12 @@ export interface IResponseType<ResultDataType = any> {
   date: Date;
 }
 
+export interface IBaseResponseAIType {
+  price: string;
+  priceNum: number;
+  currentCredits: number;
+}
+
 export interface IPaginationResponseType<ResultDataType = any> {
   message: string;
   data: {

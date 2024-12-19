@@ -1,9 +1,16 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { Roles } from 'src/decorators/roles.decorator';
 import { RolesLevel } from 'src/global/enums.global';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
+import { GeneratePostDto } from 'src/resources/post/dto/ai.dto';
 
 export const getPostsDecorator = () =>
   applyDecorators(
@@ -54,6 +61,22 @@ export const likePostDecorator = () =>
     }),
     ApiParam({
       name: 'postId',
+    }),
+  );
+
+export const aiGeneratePostDecorator = () =>
+  applyDecorators(
+    UseGuards(JwtTokenVerifyGuard),
+    ApiOperation({
+      summary: 'AI Generate a post',
+      description: 'AI Generate a post API',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+    ApiBody({
+      type: GeneratePostDto,
     }),
   );
 

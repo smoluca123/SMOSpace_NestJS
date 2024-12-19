@@ -5,14 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import openai from 'src/configs/openai.config';
+import { POST_AI_PROMPTS } from 'src/global/constant.global';
 import { handleDefaultError } from 'src/global/functions.global';
 import {
+  IBaseResponseAIType,
   IDecodedAccecssTokenType,
   IPaginationResponseType,
   IResponseType,
 } from 'src/interfaces/interfaces.global';
 import {
-  postDataInclude,
   postDataSelect,
   PostDataType,
   PostLikeDataType,
@@ -66,8 +68,8 @@ export class PostService {
           where: whereQuery,
           take: limit,
           skip: (page - 1) * limit,
-          include: {
-            ...postDataInclude,
+          select: {
+            ...postDataSelect,
             likes: {
               where: {
                 userId: userId || '',
@@ -77,6 +79,17 @@ export class PostService {
               },
             },
           },
+          // include: {
+          //   ...postDataInclude,
+          //   likes: {
+          //     where: {
+          //       userId: userId || '',
+          //     },
+          //     select: {
+          //       userId: true,
+          //     },
+          //   },
+          // },
           orderBy: { createdAt: 'desc' },
         }),
       ]);
@@ -369,6 +382,76 @@ export class PostService {
       return {
         message: 'Post liked/unliked successfully',
         data: { ...updatedPost, isLiked: !isLiked },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async aiGeneratePost({
+    data,
+    decodedAccessToken,
+  }: {
+    data: { prompt: string };
+    decodedAccessToken: IDecodedAccecssTokenType;
+  }): Promise<
+    IResponseType<
+      IBaseResponseAIType & {
+        content: string;
+      }
+    >
+  > {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          id: decodedAccessToken.userId,
+        },
+        select: {
+          credits: true,
+        },
+      });
+
+      if (user.credits <= 0) {
+        throw new BadRequestException({
+          message: 'Not enough credits',
+          date: new Date(),
+        });
+      }
+
+      const updateUser = await this.prisma.user.update({
+        where: {
+          id: decodedAccessToken.userId,
+        },
+        data: {
+          credits: {
+            decrement: 1,
+          },
+        },
+        select: {
+          credits: true,
+        },
+      });
+
+      const completion = await openai.chat.completions.create({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          ...POST_AI_PROMPTS.GENERATE_BLOG_POST,
+          { role: 'user', content: data.prompt },
+        ],
+      });
+      const resultContent = completion.choices[0].message.content
+        .replaceAll('\n', '<br>')
+        .replaceAll(/\\"/g, '"');
+      return {
+        message: 'AI generated a post successfully',
+        data: {
+          price: '1 credits',
+          priceNum: 1,
+          currentCredits: updateUser.credits,
+          content: resultContent,
+        },
         statusCode: 200,
         date: new Date(),
       };
