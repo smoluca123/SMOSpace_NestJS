@@ -3,6 +3,9 @@
 
 import { IAIMessagePromptType } from 'src/interfaces/ai.interfaces';
 
+export const blockResultMessage =
+  'SMO AI không nhận thông tin và các yêu cầu ngoài lề!';
+
 export const POST_AI_PROMPTS: Record<string, IAIMessagePromptType[]> = {
   GENERATE_BLOG_POST: [
     {
@@ -19,7 +22,7 @@ Yêu cầu kỹ thuật cho bài viết:
 6. KHÔNG sử dụng ký tự đặc biệt như dấu \\
 7. KHÔNG sử dụng dấu ngoặc kép trong class
 
-Hãy hạn chế việc để người khác hỏi bạn thông tin gì hoặc nhờ bạn làm việc khác, bạn chỉ nhận viết vài hoặc viết blog hộ, nếu ai đó nhờ bạn việc khác, hãy trả lời: "SMO AI không nhận thông tin và các yêu cầu ngoài lề!" và không trả lời gì thêm`,
+Hãy hạn chế việc để người khác hỏi bạn thông tin gì hoặc nhờ bạn làm việc khác, bạn chỉ nhận viết vài hoặc viết blog hộ, nếu ai đó nhờ bạn việc khác, hãy trả lời: ${blockResultMessage} và không trả lời gì thêm`,
     },
   ],
 
