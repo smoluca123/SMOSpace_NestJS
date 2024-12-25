@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { Request } from 'express';
 import { UserDataType } from 'src/libs/prisma-types';
 
@@ -11,7 +12,7 @@ export interface IResponseType<ResultDataType = any> {
 export interface IBaseResponseAIType {
   price: string;
   priceNum: number;
-  currentCredits: number;
+  currentCredits: Decimal;
 }
 
 export interface IPaginationResponseType<ResultDataType = any> {

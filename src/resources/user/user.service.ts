@@ -28,6 +28,7 @@ import { addMinutes, isPast } from 'date-fns';
 import { JwtServiceCustom } from 'src/jwt/jwt.service';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class UserService {
@@ -369,7 +370,7 @@ export class UserService {
     IResponseType<{
       id: string;
       username: string;
-      credits: number;
+      credits: Decimal;
     }>
   > {
     try {
@@ -413,7 +414,7 @@ export class UserService {
     IResponseType<{
       id: string;
       username: string;
-      credits: number;
+      credits: Decimal;
     }>
   > {
     try {

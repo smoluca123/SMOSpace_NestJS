@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import openai from 'src/configs/openai.config';
-import { POST_AI_PROMPTS } from 'src/global/constant.global';
+import {
+  blockResultMessage,
+  POST_AI_PROMPTS,
+} from 'src/global/constant.global';
 import { handleDefaultError } from 'src/global/functions.global';
 import {
   IBaseResponseAIType,
@@ -291,13 +294,26 @@ export class PostService {
   ): Promise<IResponseType<PostDataType>> {
     try {
       const { userId } = decodedAccessToken;
-      const post = await this.prisma.post.create({
-        data: {
-          ...data,
-          authorId: userId,
-        },
-        select: postDataSelect,
-      });
+      const [, post] = await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            credits: {
+              increment: 0.2,
+            },
+            postCount: {
+              increment: 1,
+            },
+          },
+        }),
+        this.prisma.post.create({
+          data: {
+            ...data,
+            authorId: userId,
+          },
+          select: postDataSelect,
+        }),
+      ]);
       return {
         message: 'Post created successfully',
         data: post,
@@ -413,7 +429,7 @@ export class PostService {
         },
       });
 
-      if (user.credits <= 0) {
+      if (user.credits.lte(0)) {
         throw new BadRequestException({
           message: 'Not enough credits',
           date: new Date(),
@@ -444,6 +460,17 @@ export class PostService {
       const resultContent = completion.choices[0].message.content
         .replaceAll('\n', '<br>')
         .replaceAll(/\\"/g, '"');
+
+      if (resultContent === blockResultMessage)
+        throw new BadRequestException({
+          message: blockResultMessage,
+          price: '1 credits',
+          priceNum: 1,
+          currentCredits: updateUser.credits,
+          statusCode: 400,
+          date: new Date(),
+        });
+
       return {
         message: 'AI generated a post successfully',
         data: {
@@ -575,11 +602,23 @@ export class PostService {
       if (checkPost.authorId !== userId)
         throw new ForbiddenException('Unauthorized');
 
-      await this.prisma.post.delete({
-        where: {
-          id: postId,
-        },
-      });
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            credits: {
+              decrement: 1,
+            },
+          },
+        }),
+        this.prisma.post.delete({
+          where: {
+            id: postId,
+          },
+        }),
+      ]);
 
       return {
         message: 'Post deleted successfully',

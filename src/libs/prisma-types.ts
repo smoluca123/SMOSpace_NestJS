@@ -9,7 +9,6 @@ export const userDataSelect = {
   id: true,
   username: true,
   fullName: true,
-  displayName: true,
   email: true,
   age: true,
   phoneNumber: true,
@@ -23,6 +22,10 @@ export const userDataSelect = {
     select: userTypeDataSelect,
   },
   avatar: true,
+} satisfies Prisma.UserSelect;
+
+export const userDataExtendedSelect = {
+  ...userDataSelect,
 } satisfies Prisma.UserSelect;
 
 export type UserDataType = Prisma.UserGetPayload<{

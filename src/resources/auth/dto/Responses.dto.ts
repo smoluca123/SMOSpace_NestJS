@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { UserType } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { Type } from 'class-transformer';
 import { IResponseType } from 'src/interfaces/interfaces.global';
 import { UserDataType, UserSessionDataType } from 'src/libs/prisma-types';
@@ -45,7 +46,7 @@ export class UserDataResponseDto implements UserDataType {
   isBanned: boolean;
 
   @ApiProperty()
-  credits: number;
+  credits: Decimal;
 
   @ApiProperty()
   avatar: string;
