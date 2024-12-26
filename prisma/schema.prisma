@@ -141,7 +141,7 @@ model ActiveCode {
 model Post {
   id        String   @id @default(uuid())
   content   String
-  authorId  String
+  authorId  String   @map("author_id")
   isPrivate Boolean  @map("is_private")
   likeCount Int      @default(0) @map("like_count")
   createdAt DateTime @default(now()) @map("created_at")
