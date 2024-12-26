@@ -13,7 +13,13 @@ import {
   IPaginationResponseType,
   IResponseType,
 } from 'src/interfaces/interfaces.global';
-import { userDataSelect, UserDataType } from 'src/libs/prisma-types';
+import {
+  followDataSelect,
+  FollowDataType,
+  userDataSelect,
+  UserDataType,
+  UserDataWithIsFollowedType,
+} from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   BanUserDto,
@@ -146,40 +152,59 @@ export class UserService {
   }
 
   /**
-   * Retrieves user information based on the provided user ID.
+   * Get user information by userId or username, with optional follower status check
    *
-   * @param userId The ID of the user to retrieve information for.
-   * @returns A promise that resolves to an object containing the response type.
+   * @param userId - The user ID or username to look up
+   * @param followerId - Optional ID to check if this user follows the target user
+   * @returns Promise with user data and optional isFollowedByUser flag
    */
-  async getUserInfomation(
-    userId: string,
-  ): Promise<IResponseType<UserDataType>> {
+  async getUserInfomation({
+    userId,
+    followerId,
+  }: {
+    userId: string;
+    followerId: string;
+  }): Promise<IResponseType<UserDataType | UserDataWithIsFollowedType>> {
     try {
-      // Check if the userId is provided
+      // Validate that userId is provided
       if (!userId) throw new BadRequestException('User ID is required');
 
-      // Attempt to find the user by either their username or ID
+      // Find user by either username or id
       const user = await this.prisma.user.findFirst({
         where: {
-          // Attempt to match the user by their username or ID
           OR: [{ username: userId }, { id: userId }],
         },
-        // Select the fields to include in the user data
-        select: userDataSelect,
+        select: {
+          // Include standard user fields
+          ...userDataSelect,
+          // Conditionally include followers data if followerId is provided
+          followers: followerId
+            ? {
+                where: { followerId },
+                select: { followerId: true },
+              }
+            : false,
+        },
       });
 
-      // If no user is found, throw an exception
+      // Throw error if user not found
       if (!user) throw new NotFoundException('User not found');
 
-      // Construct and return the response object
+      // Extract followers data and prepare result
+      const { followers, ...userResult } = user;
+      const result =
+        followerId && followers?.length > 0
+          ? { ...userResult, isFollowedByUser: true }
+          : userResult;
+
+      // Return success response
       return {
         message: 'Get user information successfully',
-        data: user,
+        data: result,
         statusCode: 200,
         date: new Date(),
       };
     } catch (error) {
-      // Handle any errors that occur during the process
       handleDefaultError(error);
     }
   }
@@ -574,6 +599,85 @@ export class UserService {
       return {
         message: 'User activated successfully',
         data: updatedUser,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async followUser({
+    followerUserId,
+    userId,
+  }: {
+    followerUserId: string;
+    userId: string;
+  }): Promise<
+    IResponseType<FollowDataType & { following: UserDataWithIsFollowedType }>
+  > {
+    try {
+      // Validate inputs
+      if (!userId || !followerUserId) {
+        throw new BadRequestException('Missing required user IDs');
+      }
+      if (userId === followerUserId) {
+        throw new ForbiddenException('Cannot follow yourself');
+      }
+
+      // Check if target user exists
+      const targetUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      if (!targetUser) throw new NotFoundException('Target user not found');
+
+      // Check existing follow relationship
+      const existingFollow = await this.prisma.follow.findFirst({
+        where: {
+          followerId: followerUserId,
+          followingId: userId,
+        },
+      });
+
+      // Execute follow/unfollow transaction
+      const [, , followResult] = await this.prisma.$transaction([
+        // Update target user's follower count
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            followerCount: { [existingFollow ? 'decrement' : 'increment']: 1 },
+          },
+          select: userDataSelect,
+        }),
+        // Update follower's following count
+        this.prisma.user.update({
+          where: { id: followerUserId },
+          data: {
+            followingCount: { [existingFollow ? 'decrement' : 'increment']: 1 },
+          },
+          select: userDataSelect,
+        }),
+        // Delete or create follow relationship
+        existingFollow
+          ? this.prisma.follow.delete({
+              where: { id: existingFollow.id },
+              select: followDataSelect,
+            })
+          : this.prisma.follow.create({
+              data: { followerId: followerUserId, followingId: userId },
+              select: followDataSelect,
+            }),
+      ]);
+
+      return {
+        message: `${existingFollow ? 'Unfollow' : 'Follow'} user successfully`,
+        data: {
+          ...followResult,
+          following: {
+            ...followResult.following,
+            isFollowedByUser: !existingFollow,
+          },
+        },
         statusCode: 200,
         date: new Date(),
       };

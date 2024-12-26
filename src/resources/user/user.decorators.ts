@@ -52,6 +52,12 @@ export const getUserInfomationDecorator = () =>
       name: 'userId',
       description: 'Param userId accepts sending to username',
     }),
+    ApiQuery({
+      name: 'followerId',
+      required: false,
+      description:
+        'Param followerId accepts sending to get status is follower or not',
+    }),
   );
 
 export const banUserDecorator = () =>
@@ -111,4 +117,18 @@ export const updateUserAvatarDecorator = () =>
         },
       }),
     ),
+  );
+
+export const followUserDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Follow a user',
+      description: 'Follow a user API',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+    ApiParam({ name: 'userId', description: 'User ID' }),
+    UseGuards(JwtTokenVerifyGuard),
   );

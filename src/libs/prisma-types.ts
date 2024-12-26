@@ -18,19 +18,28 @@ export const userDataSelect = {
   createdAt: true,
   updatedAt: true,
   credits: true,
+  postCount: true,
+  followerCount: true,
+  followingCount: true,
   userType: {
     select: userTypeDataSelect,
   },
   avatar: true,
 } satisfies Prisma.UserSelect;
 
-export const userDataExtendedSelect = {
-  ...userDataSelect,
-} satisfies Prisma.UserSelect;
+// export const userDataWithFollowingSelect = {
+
+// } satisfies Prisma.UserSelect;
 
 export type UserDataType = Prisma.UserGetPayload<{
   select: typeof userDataSelect;
 }>;
+
+export type UserDataWithIsFollowedType = Prisma.UserGetPayload<{
+  select: typeof userDataSelect;
+}> & {
+  isFollowedByUser: boolean;
+};
 
 export const userSessionDataSelect = {
   id: true,
@@ -89,3 +98,20 @@ export type TrendingTopicType = {
   hashtag: string;
   count: number;
 };
+
+export const followDataSelect = {
+  id: true,
+  followerId: true,
+  followingId: true,
+  createdAt: true,
+  follower: {
+    select: userDataSelect,
+  },
+  following: {
+    select: userDataSelect,
+  },
+} satisfies Prisma.FollowSelect;
+
+export type FollowDataType = Prisma.FollowGetPayload<{
+  select: typeof followDataSelect;
+}>;

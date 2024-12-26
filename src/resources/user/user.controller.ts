@@ -11,9 +11,10 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   banUserDecorator,
+  followUserDecorator,
   getAllUsersDecorator,
   getInfomationDecorator,
   getUserInfomationDecorator,
@@ -31,11 +32,6 @@ import {
   UserCreditsUpdateDto,
 } from 'src/resources/user/dto/user.dto';
 import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
-import {
-  SendVerificationEmailResponseDto,
-  UpdateAddCreditsUserResponseDto,
-  UserInfomationResponseDto,
-} from 'src/resources/user/dto/Responses.dto';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
@@ -67,19 +63,12 @@ export class UserController {
 
   @Get('/:userId')
   @getUserInfomationDecorator()
-  async getUserInfomation(@Param('userId') userId: string) {
-    return this.userService.getUserInfomation(userId);
-  }
-
-  @Put('/ban/:userId')
-  @banUserDecorator()
-  async banUser(
+  async getUserInfomation(
     @Param('userId') userId: string,
-    @Body() banUserData: BanUserDto,
+    @Query('followerId') followerId: string,
   ) {
-    const result = await this.userService.banUser(userId, banUserData);
-
-    return result;
+    console.log(followerId);
+    return this.userService.getUserInfomation({ userId, followerId });
   }
 
   @Post('/avatar/:userId')
@@ -102,32 +91,59 @@ export class UserController {
     return this.userService.updateUserAvatar(userId, file);
   }
 
-  @Put('/credits/update/:userId')
-  @ApiResponse({
-    status: 200,
-    type: UpdateAddCreditsUserResponseDto,
-  })
-  async updateUserCredits(
-    @Param('userId') userId: string,
-    @Body() data: UserCreditsUpdateDto,
-  ) {
-    const { amount } = data;
-    return this.userService.updateUserCredits(userId, {
-      credits: amount,
-    });
-  }
-
   @Post('/credits/add/:userId')
-  @ApiResponse({
-    status: 200,
-    type: UpdateAddCreditsUserResponseDto,
-  })
   async addUserCredits(
     @Param('userId') userId: string,
     @Body() data: UserCreditsUpdateDto,
   ) {
     const { amount } = data;
     return this.userService.addUserCredits(userId, {
+      credits: amount,
+    });
+  }
+
+  @Post('/active/send-verification-email/:userId')
+  async sendVerificationEmail(@Param('userId') userId: string) {
+    return this.userService.sendVerificationEmail(userId);
+  }
+
+  @Post('/active/:userId')
+  userActiveByCode(
+    @Param('userId') userId: string,
+    @Body() verificationData: UserActiveByCodeDto,
+  ) {
+    return this.userService.userActiveByCode(userId, verificationData);
+  }
+
+  @Post('/follow/:userId')
+  @followUserDecorator()
+  followUser(
+    @Param('userId') userId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    return this.userService.followUser({
+      userId,
+      followerUserId: decodedAccessToken.userId,
+    });
+  }
+
+  @Put('/ban/:userId')
+  @banUserDecorator()
+  async banUser(
+    @Param('userId') userId: string,
+    @Body() banUserData: BanUserDto,
+  ) {
+    const result = await this.userService.banUser(userId, banUserData);
+
+    return result;
+  }
+  @Put('/credits/update/:userId')
+  async updateUserCredits(
+    @Param('userId') userId: string,
+    @Body() data: UserCreditsUpdateDto,
+  ) {
+    const { amount } = data;
+    return this.userService.updateUserCredits(userId, {
       credits: amount,
     });
   }
@@ -149,26 +165,5 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.userService.updateUserInfomation(userId, updateUserDto);
-  }
-
-  @Post('/active/send-verification-email/:userId')
-  @ApiResponse({
-    status: 200,
-    type: SendVerificationEmailResponseDto,
-  })
-  async sendVerificationEmail(@Param('userId') userId: string) {
-    return this.userService.sendVerificationEmail(userId);
-  }
-
-  @Post('/active/:userId')
-  @ApiResponse({
-    status: 200,
-    type: UserInfomationResponseDto,
-  })
-  async userActiveByCode(
-    @Param('userId') userId: string,
-    @Body() verificationData: UserActiveByCodeDto,
-  ) {
-    return this.userService.userActiveByCode(userId, verificationData);
   }
 }
