@@ -72,8 +72,10 @@ model User {
   userType    UserType      @relation(fields: [type], references: [id], onDelete: Restrict)
   UserSession UserSession[]
   ActiveCode  ActiveCode[]
-  Post        Post[]
-  PostLike    PostLike[]
+  post        Post[]
+  postLike    PostLike[]
+  following   Follow[]      @relation("Following")
+  followers   Follow[]      @relation("Followers")
 
   @@map("users")
 }
@@ -165,4 +167,18 @@ model PostLike {
 
   // @@unique([userId, postId])
   @@map("post_likes")
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  follower  User @relation("Following", fields: [followerId], references: [id], onDelete: Restrict)
+  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Restrict)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
 }

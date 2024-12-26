@@ -582,50 +582,84 @@ export class PostService {
     }
   }
 
-  async deletePost({ postId, decodedAccessToken }) {
-    try {
-      const { userId } = decodedAccessToken;
-      const checkUser = await this.prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
+  /**
+   * Handle deleting a post and updating associated user data
+   * @param postId - ID of the post to delete
+   * @param userId - Optional ID of user making the delete request
+   * @returns Response object with delete status
+   */
+  private async handleDeletePost(
+    postId: string,
+    userId?: string,
+  ): Promise<IResponseType<PostDataType>> {
+    // Find the post and get its author ID
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      select: { authorId: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (userId) {
+      // If userId provided, verify user exists and has permission
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
       });
 
-      if (!checkUser) throw new NotFoundException('User not found');
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
 
-      const checkPost = await this.prisma.post.findUnique({
-        where: {
-          id: postId,
-        },
-      });
-      if (!checkPost) throw new NotFoundException('Post not found');
-      if (checkPost.authorId !== userId)
+      // Check if user is the post author
+      if (post.authorId !== userId) {
         throw new ForbiddenException('Unauthorized');
+      }
 
-      await this.prisma.$transaction([
+      // Delete post and decrement user's post count in a transaction
+      const [, deletedPost] = await this.prisma.$transaction([
         this.prisma.user.update({
-          where: {
-            id: userId,
-          },
-          data: {
-            credits: {
-              decrement: 1,
-            },
-          },
+          where: { id: userId },
+          data: { postCount: { decrement: 1 } },
         }),
         this.prisma.post.delete({
-          where: {
-            id: postId,
-          },
+          where: { id: postId },
+          select: postDataSelect,
         }),
       ]);
 
       return {
         message: 'Post deleted successfully',
-        data: null,
+        data: deletedPost,
         statusCode: 200,
         date: new Date(),
       };
+    }
+
+    // Delete post and decrement user's post count in a transaction
+    const [, deletedPost] = await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: post.authorId },
+        data: { postCount: { decrement: 1 } },
+      }),
+      this.prisma.post.delete({
+        where: { id: postId },
+        select: postDataSelect,
+      }),
+    ]);
+
+    return {
+      message: 'Post deleted successfully',
+      data: deletedPost,
+      statusCode: 200,
+      date: new Date(),
+    };
+  }
+
+  async deletePost({ postId, decodedAccessToken }) {
+    try {
+      return await this.handleDeletePost(postId, decodedAccessToken.userId);
     } catch (error) {
       handleDefaultError(error);
     }
@@ -635,19 +669,9 @@ export class PostService {
     postId,
   }: {
     postId: string;
-  }): Promise<IResponseType<null>> {
+  }): Promise<IResponseType<PostDataType>> {
     try {
-      await this.prisma.post.delete({
-        where: {
-          id: postId,
-        },
-      });
-      return {
-        message: 'Post deleted successfully',
-        data: null,
-        statusCode: 200,
-        date: new Date(),
-      };
+      return await this.handleDeletePost(postId);
     } catch (error) {
       handleDefaultError(error);
     }
