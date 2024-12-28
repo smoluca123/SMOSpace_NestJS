@@ -43,3 +43,5 @@ Hãy hạn chế việc để người khác hỏi bạn thông tin gì hoặc n
     },
   ],
 };
+
+export const MAX_LIMIT_ON_PAGE = 100;

@@ -27,12 +27,9 @@ import {
   UserActiveByCodeDto,
 } from 'src/resources/user/dto/user.dto';
 import * as bcrypt from 'bcryptjs';
-import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from 'src/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
 import { addMinutes, isPast } from 'date-fns';
-import { JwtServiceCustom } from 'src/jwt/jwt.service';
-import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -40,11 +37,8 @@ import { Decimal } from '@prisma/client/runtime/library';
 export class UserService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
     private readonly supabase: SupabaseService,
     private readonly emailService: EmailService,
-    private readonly jwt: JwtService,
-    private readonly customJwt: JwtServiceCustom,
   ) {}
 
   /**
@@ -59,12 +53,15 @@ export class UserService {
     keywords = '',
     limit = 10,
     page = 1,
+    followerId,
   }: {
     keywords?: string;
     limit?: number;
     page?: number;
+    followerId?: string;
   }): Promise<IPaginationResponseType<UserDataType>> {
     try {
+      console.log(followerId);
       // Build where query to search across multiple user fields
       const whereQuery: Prisma.UserWhereInput = {
         OR: [
@@ -87,7 +84,15 @@ export class UserService {
           orderBy: {
             createdAt: 'desc', // Sort by newest first
           },
-          select: userDataSelect,
+          select: {
+            ...userDataSelect,
+            followers: followerId
+              ? {
+                  where: { followerId },
+                  select: { followerId: true },
+                }
+              : false,
+          },
         }),
       ]);
 
@@ -95,6 +100,11 @@ export class UserService {
       const totalPage = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPage;
       const hasPreviousPage = !!totalCount && page > 1;
+
+      const result = users.map((user) => ({
+        ...user,
+        isFollowedByUser: user.followers?.length > 0 || false,
+      }));
 
       // Return formatted response
       return {
@@ -106,7 +116,7 @@ export class UserService {
           pageSize: limit,
           hasNextPage,
           hasPreviousPage,
-          items: users,
+          items: result,
         },
         statusCode: 200,
         date: new Date(),
@@ -122,7 +132,7 @@ export class UserService {
    * @param decodedAccessToken The decoded access token containing user information.
    * @returns A promise that resolves to an object containing the response type.
    */
-  async getInfomation(
+  async getInformation(
     decodedAccessToken: IDecodedAccecssTokenType,
   ): Promise<IResponseType<UserDataType>> {
     try {
@@ -158,7 +168,7 @@ export class UserService {
    * @param followerId - Optional ID to check if this user follows the target user
    * @returns Promise with user data and optional isFollowedByUser flag
    */
-  async getUserInfomation({
+  async getUserInformation({
     userId,
     followerId,
   }: {
@@ -192,10 +202,15 @@ export class UserService {
 
       // Extract followers data and prepare result
       const { followers, ...userResult } = user;
-      const result =
-        followerId && followers?.length > 0
-          ? { ...userResult, isFollowedByUser: true }
-          : userResult;
+      // const result =
+      //   followerId && followers?.length > 0
+      //     ? { ...userResult, isFollowedByUser: true }
+      //     : userResult;
+
+      const result = {
+        ...userResult,
+        isFollowedByUser: followers?.length > 0 || false,
+      };
 
       // Return success response
       return {
@@ -244,7 +259,7 @@ export class UserService {
     }
   }
 
-  async updateInfomation(
+  async updateInformation(
     decodedAccessToken: IDecodedAccecssTokenType,
     data: UpdateProfileDto,
   ) {
@@ -292,7 +307,7 @@ export class UserService {
    * @param data The data object containing the updated information.
    * @returns A promise that resolves to an object containing the response type, including the user's updated information.
    */
-  async updateUserInfomation(userId: string, data: UpdateProfileDto) {
+  async updateUserInformation(userId: string, data: UpdateProfileDto) {
     try {
       // Check if the userId is provided and throw an error if not.
       if (!userId) throw new BadRequestException('User ID is required');
