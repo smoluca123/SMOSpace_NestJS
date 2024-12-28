@@ -1,11 +1,20 @@
-import { CookieOptions } from 'express';
+import { MAX_LIMIT_ON_PAGE } from 'src/global/constant.global';
 
-export const defaultOptionsCookie: Pick<
-  CookieOptions,
-  'expires' | 'secure' | 'httpOnly' | 'sameSite' | 'path'
-> = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  path: '/',
+export const normalizePaginationParams = ({
+  limit,
+  page,
+}: {
+  limit?: number;
+  page?: number;
+}): {
+  limit: number;
+  page: number;
+} => {
+  limit = limit || 10;
+  page = page || 1;
+  limit = limit > MAX_LIMIT_ON_PAGE ? MAX_LIMIT_ON_PAGE : limit;
+  return {
+    limit,
+    page,
+  };
 };

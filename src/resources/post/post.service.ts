@@ -204,8 +204,7 @@ export class PostService {
 
       const whereQuery: Prisma.PostLikeWhereInput = {
         postId,
-        userId: userId || undefined,
-        // OR: [{ userId: userId || undefined }],
+        ...(userId ? { userId } : {}),
       };
 
       const [likes, totalCount] = await this.prisma.$transaction([

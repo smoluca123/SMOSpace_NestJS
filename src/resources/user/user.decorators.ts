@@ -18,45 +18,55 @@ import { UserAvatarUpdateDto } from 'src/resources/user/dto/user.dto';
 export const getAllUsersDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Get all users API',
-      description: 'Get all users API',
+      summary: 'Get all users with pagination',
+      description:
+        'Retrieve a paginated list of users with optional search by keywords',
     }),
     ApiQueryLimitAndPage(),
     ApiQuery({
       name: 'keywords',
       required: false,
+      description:
+        'Search users by username, email, full name, or display name',
+    }),
+    ApiQuery({
+      name: 'followerId',
+      required: false,
+      description: 'Optional follower ID (user ID) to check follow status',
     }),
   );
 
-export const getInfomationDecorator = () =>
+export const getInformationDecorator = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),
     ApiOperation({
-      summary: 'Get user infomation API',
-      description: 'Get user infomation by accessToken API',
+      summary: 'Get current user profile',
+      description: 'Retrieve the profile information of the authenticated user',
     }),
     ApiHeader({
       name: 'accessToken',
       required: true,
+      description: 'JWT access token for authentication',
     }),
   );
 
-export const getUserInfomationDecorator = () =>
+export const getUserInformationDecorator = () =>
   applyDecorators(
     Roles([RolesLevel.MANAGER]),
     ApiOperation({
-      summary: 'Get user infomation API',
-      description: 'Get user infomation by id API',
+      summary: 'Get user profile by ID',
+      description:
+        "Retrieve a specific user's profile information (Manager access required)",
     }),
     ApiParam({
       name: 'userId',
-      description: 'Param userId accepts sending to username',
+      description: 'User ID or username to retrieve',
     }),
     ApiQuery({
       name: 'followerId',
       required: false,
       description:
-        'Param followerId accepts sending to get status is follower or not',
+        'Optional follower ID to check if this user follows the target user',
     }),
   );
 
@@ -64,41 +74,49 @@ export const banUserDecorator = () =>
   applyDecorators(
     Roles([RolesLevel.ADMIN]),
     ApiOperation({
-      summary: 'Ban a user (Administrators only)',
-      description: 'Ban a user (Administrators only)',
+      summary: 'Ban/unban user',
+      description:
+        'Toggle ban status for a specific user (Admin access required)',
     }),
   );
 
-export const updateInfomationDecorator = () =>
+export const updateInformationDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Update infomation API',
-      description: 'Update infomation by accessToken API',
+      summary: 'Update current user profile',
+      description: "Update the authenticated user's profile information",
     }),
     ApiHeader({
       name: 'accessToken',
       required: true,
+      description: 'JWT access token for authentication',
     }),
     UseGuards(JwtTokenVerifyGuard),
   );
 
-export const updateUserInfomationDecorator = () =>
+export const updateUserInformationDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Update user infomation API',
-      description: 'Update user infomation by id API',
+      summary: 'Update user profile by ID',
+      description: "Update a specific user's profile information",
     }),
   );
 
 export const updateUserAvatarDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'User Update Avatar API',
-      description: 'Update user avatar',
+      summary: 'Update user avatar',
+      description: "Upload and update a user's profile picture",
     }),
     ApiConsumes('multipart/form-data'),
-    ApiParam({ name: 'userId', description: 'User ID' }),
-    ApiBody({ type: UserAvatarUpdateDto }),
+    ApiParam({
+      name: 'userId',
+      description: 'ID of the user whose avatar will be updated',
+    }),
+    ApiBody({
+      type: UserAvatarUpdateDto,
+      description: 'Avatar image file (max 50MB, image files only)',
+    }),
     UseInterceptors(
       FileInterceptor('file', {
         // storage: multer.memoryStorage(),
@@ -122,13 +140,17 @@ export const updateUserAvatarDecorator = () =>
 export const followUserDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Follow a user',
-      description: 'Follow a user API',
+      summary: 'Follow/unfollow user',
+      description: 'Toggle follow status for a specific user',
     }),
     ApiHeader({
       name: 'accessToken',
       required: true,
+      description: 'JWT access token for authentication',
     }),
-    ApiParam({ name: 'userId', description: 'User ID' }),
+    ApiParam({
+      name: 'userId',
+      description: 'ID of the user to follow/unfollow',
+    }),
     UseGuards(JwtTokenVerifyGuard),
   );

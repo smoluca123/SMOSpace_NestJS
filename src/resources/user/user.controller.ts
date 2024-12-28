@@ -11,16 +11,16 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   banUserDecorator,
   followUserDecorator,
   getAllUsersDecorator,
-  getInfomationDecorator,
-  getUserInfomationDecorator,
-  updateInfomationDecorator,
+  getInformationDecorator,
+  getUserInformationDecorator,
+  updateInformationDecorator,
   updateUserAvatarDecorator,
-  updateUserInfomationDecorator,
+  updateUserInformationDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -32,6 +32,7 @@ import {
   UserCreditsUpdateDto,
 } from 'src/resources/user/dto/user.dto';
 import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
+import { normalizePaginationParams } from 'src/utils/utils';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
@@ -42,33 +43,38 @@ export class UserController {
   @Get('/')
   @getAllUsersDecorator()
   async getAllUsers(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('page') _page: number,
+    @Query('limit') _limit: number,
     @Query('keywords') keywords: string,
+    @Query('followerId') followerId: string,
   ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: _limit,
+      page: _page,
+    });
     return this.userService.getAllUsers({
       keywords,
-      limit: +limit,
+      limit,
       page: +page,
+      followerId,
     });
   }
 
   @Get('/me')
-  @getInfomationDecorator()
-  async getInfomation(
+  @getInformationDecorator()
+  async getInformation(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
   ) {
-    return this.userService.getInfomation(decodedAccessToken);
+    return this.userService.getInformation(decodedAccessToken);
   }
 
   @Get('/:userId')
-  @getUserInfomationDecorator()
-  async getUserInfomation(
+  @getUserInformationDecorator()
+  async getUserInformation(
     @Param('userId') userId: string,
     @Query('followerId') followerId: string,
   ) {
-    console.log(followerId);
-    return this.userService.getUserInfomation({ userId, followerId });
+    return this.userService.getUserInformation({ userId, followerId });
   }
 
   @Post('/avatar/:userId')
@@ -92,6 +98,10 @@ export class UserController {
   }
 
   @Post('/credits/add/:userId')
+  @ApiOperation({
+    summary: 'Add credits to a user',
+    description: 'Add credits to a specific user',
+  })
   async addUserCredits(
     @Param('userId') userId: string,
     @Body() data: UserCreditsUpdateDto,
@@ -103,11 +113,19 @@ export class UserController {
   }
 
   @Post('/active/send-verification-email/:userId')
+  @ApiOperation({
+    summary: 'Send verification email to user',
+    description: 'Send a verification email to a specific user',
+  })
   async sendVerificationEmail(@Param('userId') userId: string) {
     return this.userService.sendVerificationEmail(userId);
   }
 
   @Post('/active/:userId')
+  @ApiOperation({
+    summary: 'Activate user account by verification code',
+    description: 'Activate a user account by verifying the provided code',
+  })
   userActiveByCode(
     @Param('userId') userId: string,
     @Body() verificationData: UserActiveByCodeDto,
@@ -137,7 +155,12 @@ export class UserController {
 
     return result;
   }
+
   @Put('/credits/update/:userId')
+  @ApiOperation({
+    summary: 'Update user credits',
+    description: 'Update the credits of a specific user',
+  })
   async updateUserCredits(
     @Param('userId') userId: string,
     @Body() data: UserCreditsUpdateDto,
@@ -149,21 +172,21 @@ export class UserController {
   }
 
   @Put('/me')
-  @updateInfomationDecorator()
+  @updateInformationDecorator()
   async updateInfomation(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     const userId = decodedAccessToken.userId;
-    return this.userService.updateUserInfomation(userId, updateProfileDto);
+    return this.userService.updateUserInformation(userId, updateProfileDto);
   }
 
   @Put('/:userId')
-  @updateUserInfomationDecorator()
+  @updateUserInformationDecorator()
   async updateUserInfomation(
     @Param('userId') userId: string,
     @Body() updateUserDto: UpdateUserDto,
   ) {
-    return this.userService.updateUserInfomation(userId, updateUserDto);
+    return this.userService.updateUserInformation(userId, updateUserDto);
   }
 }

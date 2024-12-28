@@ -37,10 +37,10 @@ import { AuthGuard } from '@nestjs/passport';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard('jwt'),
-    },
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: AuthGuard('jwt'),
+    // },
   ],
 })
 export class AppModule {}

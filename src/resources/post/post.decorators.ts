@@ -16,8 +16,9 @@ export const getPostsDecorator = () =>
   applyDecorators(
     ApiQueryLimitAndPage(),
     ApiOperation({
-      summary: 'Get all posts',
-      description: 'Get all posts API',
+      summary: 'Get posts list',
+      description:
+        'Retrieve a paginated list of posts with optional filters for keywords and user interactions',
     }),
     ApiQuery({
       name: 'keywords',
@@ -25,6 +26,7 @@ export const getPostsDecorator = () =>
     }),
     ApiQuery({
       name: 'userId',
+      description: 'Optional user ID to check if posts are liked by this user',
       required: false,
     }),
   );
@@ -35,8 +37,9 @@ export const getPostDecorator = () =>
       name: 'postId',
     }),
     ApiOperation({
-      summary: 'Get a post',
-      description: 'Get a post API',
+      summary: 'Get post details',
+      description:
+        'Retrieve detailed information for a specific post using its ID',
     }),
   );
 
@@ -44,7 +47,8 @@ export const getTrendingTopicsDecorator = () =>
   applyDecorators(
     ApiOperation({
       summary: 'Get trending topics',
-      description: 'Get trending topics API',
+      description:
+        'Retrieve a list of popular topics based on recent post engagement and activity',
     }),
   );
 
@@ -52,8 +56,8 @@ export const likePostDecorator = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),
     ApiOperation({
-      summary: 'Like a post',
-      description: 'Toggle like a post API',
+      summary: 'Toggle post like',
+      description: 'Toggle the like status of a post. Authentication required.',
     }),
     ApiHeader({
       name: 'accessToken',
@@ -68,8 +72,9 @@ export const aiGeneratePostDecorator = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),
     ApiOperation({
-      summary: 'AI Generate a post',
-      description: 'AI Generate a post API',
+      summary: 'Generate AI post',
+      description:
+        'Generate post content using AI technology. Authentication required.',
     }),
     ApiHeader({
       name: 'accessToken',
@@ -82,14 +87,21 @@ export const aiGeneratePostDecorator = () =>
 
 export const getLikesPostDecorator = () =>
   applyDecorators(
+    ApiOperation({
+      summary: 'Get post likes',
+      description:
+        'Retrieve a paginated list of users who have liked the specified post',
+    }),
     ApiQueryLimitAndPage(),
     ApiParam({
       name: 'postId',
       required: true,
+      description: 'The ID of the post to retrieve likes for',
     }),
     ApiQuery({
       name: 'userId',
       required: false,
+      description: 'Optional user ID to check if posts are liked by this user',
     }),
   );
 
@@ -97,8 +109,9 @@ export const createPostDecorator = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),
     ApiOperation({
-      summary: 'Create a post',
-      description: 'Create a post API',
+      summary: 'Create post',
+      description:
+        'Create a new post with the provided content. Authentication required.',
     }),
     ApiHeader({
       name: 'accessToken',
@@ -109,8 +122,9 @@ export const createPostDecorator = () =>
 export const updatePostDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Update a post',
-      description: 'Update a post API',
+      summary: 'Update post',
+      description:
+        'Update an existing post. Requires authentication and post ownership.',
     }),
     UseGuards(JwtTokenVerifyGuard),
     ApiHeader({
@@ -122,8 +136,9 @@ export const updatePostDecorator = () =>
 export const updatePostAsAdminDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Update a post (Managers only)',
-      description: 'Update a post API (Managers only)',
+      summary: 'Update post (Manager)',
+      description:
+        'Update any post content with manager-level access privileges',
     }),
     Roles([RolesLevel.MANAGER]),
   );
@@ -131,8 +146,9 @@ export const updatePostAsAdminDecorator = () =>
 export const deletePostDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Delete a post',
-      description: 'Delete a post API',
+      summary: 'Delete post',
+      description:
+        'Delete an existing post. Requires authentication and post ownership.',
     }),
     UseGuards(JwtTokenVerifyGuard),
     ApiHeader({
@@ -144,8 +160,8 @@ export const deletePostDecorator = () =>
 export const deletePostAsAdminDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Delete a post (Administrators only)',
-      description: 'Delete a post (Administrators only)',
+      summary: 'Delete post (Admin)',
+      description: 'Delete any post with administrator-level access privileges',
     }),
     Roles([RolesLevel.ADMIN]),
   );

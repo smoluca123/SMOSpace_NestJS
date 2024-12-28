@@ -35,6 +35,7 @@ import {
 } from 'src/interfaces/interfaces.global';
 import { PostDataType } from 'src/libs/prisma-types';
 import { GeneratePostDto } from 'src/resources/post/dto/ai.dto';
+import { normalizePaginationParams } from 'src/utils/utils';
 
 @ApiTags('Post Management')
 @ApiBearerAuth()
@@ -58,29 +59,34 @@ export class PostController {
   @getLikesPostDecorator()
   getLikesPost(
     @Param('postId') postId: string,
-    @Query('page') page: number,
-    @Query('limit') limit: number,
-    @Query('userId') userId: string,
+    @Query('page') _page: number = 1,
+    @Query('limit') _limit: number = 10,
+    @Query('userId') userId?: string,
   ) {
-    page = +page || 1;
-    limit = +limit || 10;
+    const { limit, page } = normalizePaginationParams({
+      limit: _limit,
+      page: _page,
+    });
     return this.postService.getLikesPost({ postId, limit, page, userId });
   }
 
   @Get()
   @getPostsDecorator()
   getPosts(
-    @Query('limit') limit: number,
-    @Query('page') page: number,
+    @Query('limit') _limit: string,
+    @Query('page') _page: string,
     @Query('keywords') keywords: string,
     @Query('userId') userId: string,
   ) {
-    const initLimit = +limit || 10;
-    const initPage = +page || 1;
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+
     return this.postService.getPosts({
       keywords,
-      limit: initLimit,
-      page: initPage,
+      limit,
+      page,
       userId,
     });
   }
