@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createClient, RedisClientType } from 'redis';
 
 @Injectable()
-export class RedisService implements OnModuleInit {
+export class RedisClientService implements OnModuleInit {
   public readonly client: RedisClientType;
   private readonly defaultTTL = 300; // 5 minutes
 
