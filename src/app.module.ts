@@ -12,11 +12,17 @@ import { AuthModule } from 'src/resources/auth/auth.module';
 import { JwtModuleCustom } from 'src/jwt/jwt.module';
 import { UserModule } from 'src/resources/user/user.module';
 import { PostModule } from 'src/resources/post/post.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
+import { RoleGuard } from 'src/guards/role.guard';
+import { CacheInterceptor } from '@nestjs/cache-manager';
+import { CacheModule } from 'src/cache/cache.module';
+import { RedisCacheModule } from 'src/cache/redis-cache.module';
 
 @Module({
   imports: [
+    CacheModule,
+    RedisCacheModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
@@ -34,12 +40,20 @@ import { AuthGuard } from '@nestjs/passport';
     AppService,
     JwtStrategy,
     {
+      provide: APP_INTERCEPTOR,
+      useClass: CacheInterceptor,
+    },
+    {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
     {
       provide: APP_GUARD,
       useClass: AuthGuard('jwt'),
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RoleGuard,
     },
   ],
 })

@@ -6,6 +6,11 @@ const configuration = () => ({
   // Server
   SERVER_PORT: parseInt(process.env.SERVER_PORT || '8080', 10),
 
+  // Redis
+  REDIS_HOST: process.env.REDIS_HOST,
+  REDIS_PORT: parseInt(process.env.REDIS_PORT || '6379', 10),
+  REDIS_PASSWORD: process.env.REDIS_PASSWORD,
+
   // JWT
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,

@@ -61,7 +61,6 @@ export class UserService {
     followerId?: string;
   }): Promise<IPaginationResponseType<UserDataType>> {
     try {
-      console.log(followerId);
       // Build where query to search across multiple user fields
       const whereQuery: Prisma.UserWhereInput = {
         OR: [
@@ -86,12 +85,10 @@ export class UserService {
           },
           select: {
             ...userDataSelect,
-            followers: followerId
-              ? {
-                  where: { followerId },
-                  select: { followerId: true },
-                }
-              : false,
+            followers: {
+              where: { followerId },
+              select: { followerId: true },
+            },
           },
         }),
       ]);
@@ -100,10 +97,9 @@ export class UserService {
       const totalPage = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPage;
       const hasPreviousPage = !!totalCount && page > 1;
-
-      const result = users.map((user) => ({
+      const result = users.map(({ followers, ...user }) => ({
         ...user,
-        isFollowedByUser: user.followers?.length > 0 || false,
+        isFollowedByUser: followers?.length > 0 || false,
       }));
 
       // Return formatted response

@@ -4,6 +4,11 @@ export const envSchema = z.object({
   // Server
   SERVER_PORT: z.number().min(1, 'Server port must be a positive integer'),
 
+  // Redis
+  REDIS_HOST: z.string().min(1, 'Redis host is required'),
+  REDIS_PORT: z.number().min(1, 'Redis port must be a positive integer'),
+  REDIS_PASSWORD: z.string().min(1, 'Redis password is required'),
+
   // JWT
   JWT_SECRET: z.string().min(1, 'JWT secret is required'),
   JWT_EXPIRES_IN: z.string().min(1, 'JWT expiration time is required'),
