@@ -47,6 +47,7 @@ export class PostService {
     userId?: string;
   }): Promise<IPaginationResponseType<PostDataType>> {
     try {
+      // console.log(123);
       const whereQuery: Prisma.PostWhereInput = {
         isPrivate: false,
         OR: [
