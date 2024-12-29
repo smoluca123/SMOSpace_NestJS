@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RedisService } from 'src/cache/redis.service';
+import { RedisClientService } from 'src/cache/redis.service';
 import { Roles } from 'src/decorators/roles.decorator';
 import { IRequestWithDecodedAuthToken } from 'src/interfaces/interfaces.global';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -15,7 +15,7 @@ export class RoleGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private prisma: PrismaService,
-    private redisService: RedisService,
+    private redisClientService: RedisClientService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -34,8 +34,7 @@ export class RoleGuard implements CanActivate {
 
     const cacheKey = `role_${id}_${authCode}`;
     let cachedRole: string | number =
-      await this.redisService.client.get(cacheKey);
-    console.log(cachedRole);
+      await this.redisClientService.client.get(cacheKey);
 
     if (!cachedRole) {
       const auth = await this.prisma.authCode.findUnique({
@@ -49,7 +48,7 @@ export class RoleGuard implements CanActivate {
         throw new UnauthorizedException('Invalid authentication');
       }
 
-      await this.redisService.set(cacheKey, auth.roleLevel);
+      await this.redisClientService.client.set(cacheKey, auth.roleLevel);
 
       // await this.redisCache.set(cacheKey, auth.roleLevel, 10);
       cachedRole = auth.roleLevel;
