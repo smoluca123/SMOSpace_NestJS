@@ -696,4 +696,22 @@ export class UserService {
       handleDefaultError(error);
     }
   }
+
+  // async getFollowers({
+  //   userId,
+  //   limit = 10,
+  //   page = 1,
+  // }: {
+  //   userId: string;
+  //   limit?: number;
+  //   page?: number;
+  // }) {
+  //   try {
+  //     const followers = await this.prisma.follow.findMany({
+  //       where: { followingId: userId },
+  //     });
+  //   } catch (error) {
+  //     handleDefaultError(error);
+  //   }
+  // }
 }

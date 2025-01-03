@@ -154,3 +154,16 @@ export const followUserDecorator = () =>
     }),
     UseGuards(JwtTokenVerifyGuard),
   );
+
+export const getFollowersDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get followers of a user',
+      description: 'Retrieve the followers of a specific user',
+    }),
+    ApiParam({
+      name: 'userId',
+      description: 'ID of the user whose followers will be retrieved',
+    }),
+    ApiQueryLimitAndPage(),
+  );
