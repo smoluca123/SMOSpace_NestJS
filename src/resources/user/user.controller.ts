@@ -16,6 +16,8 @@ import {
   banUserDecorator,
   followUserDecorator,
   getAllUsersDecorator,
+  getFollowersByIdDecorator,
+  getFollowersDecorator,
   getInformationDecorator,
   getUserInformationDecorator,
   updateInformationDecorator,
@@ -39,6 +41,41 @@ import { normalizePaginationParams } from 'src/utils/utils';
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  @Get('/followers')
+  @getFollowersDecorator()
+  async getFollowers(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('page') _page: number,
+    @Query('limit') _limit: number,
+  ) {
+    const { userId } = decodedAccessToken;
+    const { limit, page } = normalizePaginationParams({
+      limit: _limit,
+      page: _page,
+    });
+    return this.userService.getFollowers({ userId, limit, page });
+  }
+
+  @Get('/followers/:userId')
+  @getFollowersByIdDecorator()
+  async getFollowersById(
+    @Param('userId') userId: string,
+    @Query('page') _page: number,
+    @Query('limit') _limit: number,
+    @Query('followerId') followerId: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: _limit,
+      page: _page,
+    });
+    return this.userService.getFollowersById({
+      userId,
+      limit,
+      page,
+      followerId,
+    });
+  }
 
   @Get('/')
   @getAllUsersDecorator()
@@ -132,12 +169,6 @@ export class UserController {
   ) {
     return this.userService.userActiveByCode(userId, verificationData);
   }
-
-  // @Get('/followers/:userId')
-  // @getFollowersDecorator()
-  // async getFollowers(@Param('userId') userId: string) {
-  //   return this.userService.getFollowers(userId);
-  // }
 
   @Post('/follow/:userId')
   @followUserDecorator()

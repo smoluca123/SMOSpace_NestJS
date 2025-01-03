@@ -155,7 +155,7 @@ export const followUserDecorator = () =>
     UseGuards(JwtTokenVerifyGuard),
   );
 
-export const getFollowersDecorator = () =>
+export const getFollowersByIdDecorator = () =>
   applyDecorators(
     ApiOperation({
       summary: 'Get followers of a user',
@@ -165,5 +165,26 @@ export const getFollowersDecorator = () =>
       name: 'userId',
       description: 'ID of the user whose followers will be retrieved',
     }),
+    ApiQueryLimitAndPage(),
+    ApiQuery({
+      name: 'followerId',
+      required: false,
+      description:
+        'Optional follower ID to check if this user follows the target user',
+    }),
+  );
+
+export const getFollowersDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get followers of current user',
+      description: 'Retrieve the followers of the authenticated user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
     ApiQueryLimitAndPage(),
   );
