@@ -59,7 +59,9 @@ export class UserService {
     limit?: number;
     page?: number;
     followerId?: string;
-  }): Promise<IPaginationResponseType<UserDataType>> {
+  }): Promise<
+    IPaginationResponseType<UserDataType | UserDataWithIsFollowedType>
+  > {
     try {
       // Build where query to search across multiple user fields
       const whereQuery: Prisma.UserWhereInput = {
@@ -618,6 +620,13 @@ export class UserService {
     }
   }
 
+  /**
+   * Follow or unfollow a user
+   *
+   * @param followerUserId - ID of the user who wants to follow/unfollow
+   * @param userId - ID of the target user to be followed/unfollowed
+   * @returns Promise containing follow data and updated following user info
+   */
   async followUser({
     followerUserId,
     userId,
@@ -628,21 +637,23 @@ export class UserService {
     IResponseType<FollowDataType & { following: UserDataWithIsFollowedType }>
   > {
     try {
-      // Validate inputs
+      // Validate that both user IDs are provided
       if (!userId || !followerUserId) {
         throw new BadRequestException('Missing required user IDs');
       }
+
+      // Prevent users from following themselves
       if (userId === followerUserId) {
         throw new ForbiddenException('Cannot follow yourself');
       }
 
-      // Check if target user exists
+      // Check if the target user exists in database
       const targetUser = await this.prisma.user.findUnique({
         where: { id: userId },
       });
       if (!targetUser) throw new NotFoundException('Target user not found');
 
-      // Check existing follow relationship
+      // Check if a follow relationship already exists between the users
       const existingFollow = await this.prisma.follow.findFirst({
         where: {
           followerId: followerUserId,
@@ -650,9 +661,9 @@ export class UserService {
         },
       });
 
-      // Execute follow/unfollow transaction
+      // Execute multiple database operations in a transaction
       const [, , followResult] = await this.prisma.$transaction([
-        // Update target user's follower count
+        // Update the follower count of the target user
         this.prisma.user.update({
           where: { id: userId },
           data: {
@@ -660,7 +671,7 @@ export class UserService {
           },
           select: userDataSelect,
         }),
-        // Update follower's following count
+        // Update the following count of the follower
         this.prisma.user.update({
           where: { id: followerUserId },
           data: {
@@ -668,7 +679,7 @@ export class UserService {
           },
           select: userDataSelect,
         }),
-        // Delete or create follow relationship
+        // Either delete or create the follow relationship
         existingFollow
           ? this.prisma.follow.delete({
               where: { id: existingFollow.id },
@@ -680,6 +691,7 @@ export class UserService {
             }),
       ]);
 
+      // Return success response with updated follow data
       return {
         message: `${existingFollow ? 'Unfollow' : 'Follow'} user successfully`,
         data: {
@@ -697,21 +709,212 @@ export class UserService {
     }
   }
 
-  // async getFollowers({
-  //   userId,
-  //   limit = 10,
-  //   page = 1,
-  // }: {
-  //   userId: string;
-  //   limit?: number;
-  //   page?: number;
-  // }) {
-  //   try {
-  //     const followers = await this.prisma.follow.findMany({
-  //       where: { followingId: userId },
-  //     });
-  //   } catch (error) {
-  //     handleDefaultError(error);
-  //   }
-  // }
+  /**
+   * Get followers of a user with pagination
+   * @param userId - ID of the user whose followers to get
+   * @param limit - Number of followers per page (default: 10)
+   * @param page - Page number to fetch (default: 1)
+   * @returns Paginated list of followers with follow status
+   */
+  async getFollowers({
+    userId,
+    limit = 10,
+    page = 1,
+  }: {
+    userId: string;
+    limit?: number;
+    page?: number;
+  }): Promise<
+    IPaginationResponseType<
+      Omit<FollowDataType, 'following'> & {
+        follower: UserDataWithIsFollowedType;
+      }
+    >
+  > {
+    try {
+      // Validate user ID is provided
+      if (!userId) throw new BadRequestException('User ID is required');
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { following, ...filledFollowData } = followDataSelect;
+
+      // Build where query to get followers of specified user
+      const whereQuery: Prisma.FollowWhereInput = {
+        followingId: userId,
+      };
+
+      // Execute transaction to get total count and followers data
+      const [totalCount, followers] = await this.prisma.$transaction([
+        // Get total number of followers
+        this.prisma.follow.count({ where: whereQuery }),
+        // Get paginated followers with their follow status
+        this.prisma.follow.findMany({
+          where: whereQuery,
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            ...filledFollowData,
+            follower: {
+              select: {
+                ...userDataSelect,
+                // Check if the user follows back
+                followers: {
+                  where: {
+                    followerId: userId,
+                  },
+                  select: {
+                    id: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+      // Calculate pagination metadata
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPage;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      // Transform followers data to include isFollowedByUser flag
+      const items = followers.map((followerItem) => {
+        const { followers, ...follower } = followerItem.follower;
+
+        return {
+          ...followerItem,
+          follower: {
+            ...follower,
+            isFollowedByUser: followers.length > 0,
+          },
+        };
+      });
+
+      // Return success response with pagination and followers data
+      return {
+        message: 'Get followers successfully',
+        data: {
+          currentPage: page,
+          totalCount,
+          totalPage,
+          pageSize: limit,
+          hasNextPage,
+          hasPreviousPage,
+          items,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  /**
+   * Get followers of a user by their ID with pagination
+   * @param userId - ID of the user to get followers for
+   * @param limit - Number of followers per page (default: 10)
+   * @param page - Page number to fetch (default: 1)
+   * @param followerId - Optional ID to check if followers are followed by this user
+   * @returns Paginated response containing follower data with isFollowedByUser flag
+   */
+  async getFollowersById({
+    userId,
+    limit = 10,
+    page = 1,
+    followerId,
+  }: {
+    userId: string;
+    limit?: number;
+    page?: number;
+    followerId?: string;
+  }): Promise<
+    IPaginationResponseType<
+      Omit<FollowDataType, 'following'> & {
+        follower: UserDataWithIsFollowedType;
+      }
+    >
+  > {
+    try {
+      // Check if user exists
+      const existedUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: userDataSelect,
+      });
+      if (!existedUser) throw new NotFoundException('User not found');
+
+      // Remove 'following' field from follow data select
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { following, ...filledFollowData } = followDataSelect;
+
+      // Build where query for followers
+      const whereQuery: Prisma.FollowWhereInput = {
+        followingId: userId,
+      };
+
+      // Execute transaction to get total count and followers data
+      const [totalCount, followers] = await this.prisma.$transaction([
+        this.prisma.follow.count({ where: whereQuery }),
+        this.prisma.follow.findMany({
+          where: whereQuery,
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            ...filledFollowData,
+            follower: {
+              select: {
+                ...userDataSelect,
+                followers: {
+                  where: {
+                    followerId: followerId || '',
+                  },
+                  select: {
+                    id: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+      // Calculate pagination metadata
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPage;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      // Transform followers data to include isFollowedByUser flag
+      const items = followers.map((followerItem) => {
+        const { followers, ...follower } = followerItem.follower;
+        return {
+          ...followerItem,
+          follower: {
+            ...follower,
+            isFollowedByUser: followers.length > 0,
+          },
+        };
+      });
+
+      // Return success response with pagination and followers data
+      return {
+        message: 'Get followers successfully',
+        data: {
+          currentPage: page,
+          totalCount,
+          totalPage,
+          pageSize: limit,
+          hasNextPage,
+          hasPreviousPage,
+          // following: existedUser,
+          items,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
 }

@@ -10,9 +10,11 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { Request as RequestExpress } from 'express';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
+import { User } from '@prisma/client';
 
 interface RequestNewType extends RequestExpress {
   decodedAccessToken?: IDecodedAccecssTokenType;
+  userData?: User;
 }
 @Injectable()
 export class JwtTokenVerifyGuard implements CanActivate {
@@ -44,6 +46,7 @@ export class JwtTokenVerifyGuard implements CanActivate {
     return this.validateTokenKeyMatch({
       accessToken,
       decodedAccessToken,
+      request,
     });
   }
 
@@ -55,9 +58,11 @@ export class JwtTokenVerifyGuard implements CanActivate {
   private async validateTokenKeyMatch({
     accessToken,
     decodedAccessToken,
+    request,
   }: {
     decodedAccessToken: IDecodedAccecssTokenType;
     accessToken: string;
+    request: RequestNewType;
   }): Promise<boolean> {
     if (!decodedAccessToken.userId || !decodedAccessToken.username)
       throw new UnauthorizedException(
@@ -84,6 +89,8 @@ export class JwtTokenVerifyGuard implements CanActivate {
       throw new UnauthorizedException('User not found or has been deleted');
     }
     if (user.isBanned) throw new ForbiddenException('User has been banned');
+
+    request.userData = user;
 
     // let decodedRefreshToken: any;
     // try {
