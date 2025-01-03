@@ -133,6 +133,12 @@ export class UserController {
     return this.userService.userActiveByCode(userId, verificationData);
   }
 
+  // @Get('/followers/:userId')
+  // @getFollowersDecorator()
+  // async getFollowers(@Param('userId') userId: string) {
+  //   return this.userService.getFollowers(userId);
+  // }
+
   @Post('/follow/:userId')
   @followUserDecorator()
   followUser(
