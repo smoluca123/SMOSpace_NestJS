@@ -21,6 +21,7 @@ import {
   deletePostAsAdminDecorator,
   deletePostDecorator,
   getLikesPostDecorator,
+  getMyPostsDecorator,
   getPostDecorator,
   getPostsDecorator,
   getTrendingTopicsDecorator,
@@ -43,16 +44,35 @@ import { normalizePaginationParams } from 'src/utils/utils';
 export class PostController {
   constructor(private readonly postService: PostService) {}
 
+  @Get('/my-posts')
+  @getMyPostsDecorator()
+  getMyPosts(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+    @Query('keywords') keywords?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+
+    const { userId } = decodedAccessToken;
+
+    return this.postService.getPosts({
+      keywords,
+      limit,
+      page,
+      userId,
+      likeUserId: userId,
+      getPrivatePost: true,
+    });
+  }
+
   @Get('trending')
   @getTrendingTopicsDecorator()
   getTrendingTopics() {
     return this.postService.getTrendingTopics();
-  }
-
-  @Get(':postId')
-  @getPostDecorator()
-  getPostById(@Param('postId') postId: string) {
-    return this.postService.getPostById({ postId });
   }
 
   @Get('get-likes/:postId')
@@ -70,13 +90,20 @@ export class PostController {
     return this.postService.getLikesPost({ postId, limit, page, userId });
   }
 
-  @Get()
+  @Get(':postId')
+  @getPostDecorator()
+  getPostById(@Param('postId') postId: string) {
+    return this.postService.getPostById({ postId });
+  }
+
+  @Get('/')
   @getPostsDecorator()
   getPosts(
-    @Query('limit') _limit: string,
-    @Query('page') _page: string,
-    @Query('keywords') keywords: string,
-    @Query('userId') userId: string,
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+    @Query('keywords') keywords?: string,
+    @Query('userId') userId?: string,
+    @Query('likeUserId') likeUserId?: string,
   ) {
     const { limit, page } = normalizePaginationParams({
       limit: +_limit,
@@ -88,6 +115,7 @@ export class PostController {
       limit,
       page,
       userId,
+      likeUserId,
     });
   }
 

@@ -26,7 +26,31 @@ export const getPostsDecorator = () =>
     }),
     ApiQuery({
       name: 'userId',
-      description: 'Optional user ID to check if posts are liked by this user',
+      description: 'Filter posts by specific user ID',
+      required: false,
+    }),
+    ApiQuery({
+      name: 'likeUserId',
+      description: 'User ID to check like status of posts for this user',
+      required: false,
+    }),
+  );
+
+export const getMyPostsDecorator = () =>
+  applyDecorators(
+    ApiQueryLimitAndPage(),
+    UseGuards(JwtTokenVerifyGuard),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+    ApiOperation({
+      summary: 'Get my posts list',
+      description:
+        'Retrieve a paginated list of posts created by the authenticated user',
+    }),
+    ApiQuery({
+      name: 'keywords',
       required: false,
     }),
   );
