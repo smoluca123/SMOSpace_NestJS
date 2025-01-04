@@ -92,7 +92,7 @@ export class UserController {
     return this.userService.getAllUsers({
       keywords,
       limit,
-      page: +page,
+      page,
       followerId,
     });
   }

@@ -40,16 +40,20 @@ export class PostService {
     limit,
     page,
     userId,
+    likeUserId,
+    getPrivatePost = false,
   }: {
     keywords?: string;
     limit: number;
     page: number;
     userId?: string;
+    likeUserId?: string;
+    getPrivatePost?: boolean;
   }): Promise<IPaginationResponseType<PostDataType>> {
     try {
-      // console.log(123);
       const whereQuery: Prisma.PostWhereInput = {
-        isPrivate: false,
+        authorId: userId || undefined,
+        ...(!getPrivatePost ? { isPrivate: false } : {}),
         OR: [
           {
             content: {
@@ -76,7 +80,7 @@ export class PostService {
             ...postDataSelect,
             likes: {
               where: {
-                userId: userId || '',
+                userId: likeUserId || '',
               },
               select: {
                 userId: true,
