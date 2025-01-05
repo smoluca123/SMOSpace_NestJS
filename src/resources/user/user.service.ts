@@ -732,6 +732,7 @@ export class UserService {
     >
   > {
     try {
+      console.log('userId', limit, page);
       // Validate user ID is provided
       if (!userId) throw new BadRequestException('User ID is required');
 

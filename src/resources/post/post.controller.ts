@@ -79,13 +79,13 @@ export class PostController {
   @getLikesPostDecorator()
   getLikesPost(
     @Param('postId') postId: string,
-    @Query('page') _page: number = 1,
-    @Query('limit') _limit: number = 10,
+    @Query('page') _page: string,
+    @Query('limit') _limit: string,
     @Query('userId') userId?: string,
   ) {
     const { limit, page } = normalizePaginationParams({
-      limit: _limit,
-      page: _page,
+      limit: +_limit,
+      page: +_page,
     });
     return this.postService.getLikesPost({ postId, limit, page, userId });
   }

@@ -46,13 +46,13 @@ export class UserController {
   @getFollowersDecorator()
   async getFollowers(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
-    @Query('page') _page: number,
-    @Query('limit') _limit: number,
+    @Query('page') _page: string,
+    @Query('limit') _limit: string,
   ) {
     const { userId } = decodedAccessToken;
     const { limit, page } = normalizePaginationParams({
-      limit: _limit,
-      page: _page,
+      limit: +_limit,
+      page: +_page,
     });
     return this.userService.getFollowers({ userId, limit, page });
   }
@@ -61,13 +61,13 @@ export class UserController {
   @getFollowersByIdDecorator()
   async getFollowersById(
     @Param('userId') userId: string,
-    @Query('page') _page: number,
-    @Query('limit') _limit: number,
+    @Query('page') _page: string,
+    @Query('limit') _limit: string,
     @Query('followerId') followerId: string,
   ) {
     const { limit, page } = normalizePaginationParams({
-      limit: _limit,
-      page: _page,
+      limit: +_limit,
+      page: +_page,
     });
     return this.userService.getFollowersById({
       userId,
@@ -80,14 +80,14 @@ export class UserController {
   @Get('/')
   @getAllUsersDecorator()
   async getAllUsers(
-    @Query('page') _page: number,
-    @Query('limit') _limit: number,
+    @Query('page') _page: string,
+    @Query('limit') _limit: string,
     @Query('keywords') keywords: string,
     @Query('followerId') followerId: string,
   ) {
     const { limit, page } = normalizePaginationParams({
-      limit: _limit,
-      page: _page,
+      limit: +_limit,
+      page: +_page,
     });
     return this.userService.getAllUsers({
       keywords,
