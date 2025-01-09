@@ -1,0 +1,20 @@
+{
+  "deploy": {
+    "healthcheck": {
+      "path": "/health",
+      "timeout": 180
+    }
+  },
+  "scaling": {
+    "metrics": {
+      "cpu": {
+        "threshold": 95,
+        "duration": "5m"
+      },
+      "memory": {
+        "threshold": 90,
+        "duration": "5m"
+      }
+    }
+  }
+}
