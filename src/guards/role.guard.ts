@@ -28,7 +28,6 @@ export class RoleGuard implements CanActivate {
     const minRoleLevel = Math.min(...rolesLevel);
 
     const request = context.switchToHttp().getRequest();
-    console.log(request.user);
     const {
       user: { id, auth_code: authCode },
     } = request as IRequestWithDecodedAuthToken;
