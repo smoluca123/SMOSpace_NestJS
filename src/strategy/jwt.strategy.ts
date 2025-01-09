@@ -3,17 +3,16 @@ import { Strategy, ExtractJwt } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Cache } from '@nestjs/cache-manager';
-import { RedisClientService } from 'src/cache/redis.service';
-// import { Cache } from 'cache-manager';
+// import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     readonly config: ConfigService,
     readonly prisma: PrismaService,
-    readonly redisClientService: RedisClientService,
-    @Inject('REDIS_CACHE') readonly redisCache: Cache,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -24,7 +23,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: { id: string; authCode: string }) {
     const cacheKey = `authCode:${payload.id}`;
-    const cachedAuthCode = await this.redisClientService.client.get(cacheKey);
+    const cachedAuthCode = await this.cacheManager.get(cacheKey);
+
     if (!cachedAuthCode) {
       const auth = await this.prisma.authCode.findFirst({
         where: {
@@ -35,7 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       });
       if (!auth) throw new UnauthorizedException();
-      await this.redisClientService.client.set(cacheKey, 1);
+      await this.cacheManager.set(cacheKey, 1, 0);
     }
     return payload;
   }
