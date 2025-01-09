@@ -10,4 +10,9 @@ export class AppController {
   getInfoApi(): IInfoApiType {
     return this.appService.getInfoApi();
   }
+
+  @Get('/health')
+  getHealth() {
+    return this.appService.getHealth();
+  }
 }

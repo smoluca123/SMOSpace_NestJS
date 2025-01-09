@@ -9,6 +9,7 @@ import {
   Put,
   Query,
   UploadedFile,
+  UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -35,9 +36,11 @@ import {
 } from 'src/resources/user/dto/user.dto';
 import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
 import { normalizePaginationParams } from 'src/utils/utils';
+import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
+@UseGuards(AuthGuard('jwt'))
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}

@@ -13,7 +13,6 @@ import { JwtModuleCustom } from 'src/jwt/jwt.module';
 import { UserModule } from 'src/resources/user/user.module';
 import { PostModule } from 'src/resources/post/post.module';
 import { APP_GUARD } from '@nestjs/core';
-import { AuthGuard } from '@nestjs/passport';
 import { RoleGuard } from 'src/guards/role.guard';
 import cacheConfig from 'src/configs/cache.config';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -67,10 +66,10 @@ import { redisStore } from 'cache-manager-redis-yet';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard('jwt'),
-    },
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: AuthGuard('jwt'),
+    // },
     {
       provide: APP_GUARD,
       useClass: RoleGuard,

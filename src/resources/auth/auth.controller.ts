@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Headers, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
@@ -16,10 +24,12 @@ import { UserAgent } from 'src/decorators/utils.decorator';
 import { IpAddress } from 'src/decorators/ip.decorator';
 import { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
+import { AuthGuard } from '@nestjs/passport';
 // import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
+@UseGuards(AuthGuard('jwt'))
 @Throttle({
   default: {
     ttl: 60 * 60 * 1000, // 1 hour

@@ -7,6 +7,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -37,9 +38,11 @@ import {
 import { PostDataType } from 'src/libs/prisma-types';
 import { GeneratePostDto } from 'src/resources/post/dto/ai.dto';
 import { normalizePaginationParams } from 'src/utils/utils';
+import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('Post Management')
 @ApiBearerAuth()
+@UseGuards(AuthGuard('jwt'))
 @Controller('post')
 export class PostController {
   constructor(private readonly postService: PostService) {}

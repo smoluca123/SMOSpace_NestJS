@@ -13,4 +13,10 @@ export class AppService {
       description: 'New Social Media API',
     };
   }
+
+  getHealth() {
+    return {
+      status: 'ok',
+    };
+  }
 }
