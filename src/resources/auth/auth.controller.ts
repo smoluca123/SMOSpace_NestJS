@@ -25,11 +25,12 @@ import { IpAddress } from 'src/decorators/ip.decorator';
 import { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
+import { RoleGuard } from 'src/guards/role.guard';
 // import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RoleGuard)
 @Throttle({
   default: {
     ttl: 60 * 60 * 1000, // 1 hour

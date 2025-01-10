@@ -13,7 +13,6 @@ import { JwtModuleCustom } from 'src/jwt/jwt.module';
 import { UserModule } from 'src/resources/user/user.module';
 import { PostModule } from 'src/resources/post/post.module';
 import { APP_GUARD } from '@nestjs/core';
-import { RoleGuard } from 'src/guards/role.guard';
 import cacheConfig from 'src/configs/cache.config';
 import { CacheModule } from '@nestjs/cache-manager';
 // import * as redisStore from 'cache-manager-redis-store';
@@ -39,13 +38,24 @@ import { redisStore } from 'cache-manager-redis-yet';
       isGlobal: true,
       useFactory: async (configService: ConfigService) => ({
         store: await redisStore({
-          url: `redis://${configService.get('REDIS_HOST')}:${configService.get('REDIS_PORT')}`,
+          // url: `redis://${configService.get('REDIS_HOST')}:${configService.get('REDIS_PORT')}`,
+          socket: {
+            host: configService.get('REDIS_HOST'),
+            port: configService.get('REDIS_PORT'),
+            reconnectStrategy: (retries) => {
+              // Thử kết nối lại sau mỗi 1s, tối đa 10 lần
+              if (retries > 10) {
+                return new Error('Không thể kết nối đến Redis sau 10 lần thử');
+              }
+              return 1000;
+            },
+          },
           password: configService.get('REDIS_PASSWORD'),
           ttl: 300 * 1000, //5 minutes
         }),
-        host: configService.get('REDIS_HOST'),
-        port: configService.get('REDIS_PORT'),
-        password: configService.get('REDIS_PASSWORD'),
+        // host: configService.get('REDIS_HOST'),
+        // port: configService.get('REDIS_PORT'),
+        // password: configService.get('REDIS_PASSWORD'),
 
         max: 100,
       }),
@@ -70,10 +80,10 @@ import { redisStore } from 'cache-manager-redis-yet';
     //   provide: APP_GUARD,
     //   useClass: AuthGuard('jwt'),
     // },
-    {
-      provide: APP_GUARD,
-      useClass: RoleGuard,
-    },
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: RoleGuard,
+    // },
   ],
 })
 export class AppModule {}

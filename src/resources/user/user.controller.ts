@@ -37,10 +37,11 @@ import {
 import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
 import { normalizePaginationParams } from 'src/utils/utils';
 import { AuthGuard } from '@nestjs/passport';
+import { RoleGuard } from 'src/guards/role.guard';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RoleGuard)
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}

@@ -39,10 +39,11 @@ import { PostDataType } from 'src/libs/prisma-types';
 import { GeneratePostDto } from 'src/resources/post/dto/ai.dto';
 import { normalizePaginationParams } from 'src/utils/utils';
 import { AuthGuard } from '@nestjs/passport';
+import { RoleGuard } from 'src/guards/role.guard';
 
 @ApiTags('Post Management')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RoleGuard)
 @Controller('post')
 export class PostController {
   constructor(private readonly postService: PostService) {}
