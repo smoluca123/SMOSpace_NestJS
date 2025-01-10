@@ -24,7 +24,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: { id: string; authCode: string }) {
     const cacheKey = `authCode:${payload.id}`;
     const cachedAuthCode = await this.cacheManager.get(cacheKey);
-
     if (!cachedAuthCode) {
       const auth = await this.prisma.authCode.findFirst({
         where: {
