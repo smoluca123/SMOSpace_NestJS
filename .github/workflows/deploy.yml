@@ -19,7 +19,7 @@ jobs:
         password: ${{secrets.PASSWORD}}
         port: 22
         script: |
-          cd /smospace-be
+          cd /root/smospace-be
           git pull origin main
           bun i
           pm2 stop smospace-be
