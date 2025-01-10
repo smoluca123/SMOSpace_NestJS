@@ -17,6 +17,7 @@ import cacheConfig from 'src/configs/cache.config';
 import { CacheModule, CacheStore } from '@nestjs/cache-manager';
 // import * as redisStore from 'cache-manager-redis-store';
 import { redisStore } from 'cache-manager-redis-yet';
+import { PostCommentModule } from 'src/resources/post-comment/post-comment.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -94,6 +95,7 @@ import { redisStore } from 'cache-manager-redis-yet';
     PrismaModule,
     AuthModule,
     UserModule,
+    PostCommentModule,
     PostModule,
   ],
   controllers: [AppController],
