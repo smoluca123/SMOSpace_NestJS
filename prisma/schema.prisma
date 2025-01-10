@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearchPostgres", "omitApi"]
+  previewFeatures = ["fullTextSearchPostgres"]
 }
 
 datasource db {
@@ -76,6 +76,7 @@ model User {
   postLike    PostLike[]
   following   Follow[]      @relation("Following")
   followers   Follow[]      @relation("Followers")
+  comments    PostComment[]
 
   @@map("users")
 }
@@ -149,8 +150,9 @@ model Post {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  author User       @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  likes  PostLike[]
+  author   User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  likes    PostLike[]
+  comments PostComment[]
 
   @@map("posts")
 }
@@ -181,4 +183,21 @@ model Follow {
 
   @@unique([followerId, followingId])
   @@map("follows")
+}
+
+model PostComment {
+  id        String   @id @default(uuid())
+  content   String
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  replyToId String?  @map("reply_to_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  post    Post          @relation(fields: [postId], references: [id], onDelete: Restrict)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  replyTo PostComment?  @relation("CommentReplies", fields: [replyToId], references: [id], onDelete: Restrict)
+  replies PostComment[] @relation("CommentReplies")
+
+  @@map("post_comments")
 }
