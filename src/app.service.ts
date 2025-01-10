@@ -15,6 +15,7 @@ export class AppService {
         name: 'Luca Dev',
         email: 'icaluca12@gmail.com',
         url: 'https://www.facebook.com/lucann.info',
+        github: 'https://github.com/smoluca123',
       },
     };
   }
