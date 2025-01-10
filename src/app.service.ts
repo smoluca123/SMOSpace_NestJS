@@ -11,6 +11,11 @@ export class AppService {
       author: 'Luca Dev',
       swagger: '/swagger',
       description: 'New Social Media API',
+      contact: {
+        name: 'Luca Dev',
+        email: 'icaluca12@gmail.com',
+        url: 'https://www.facebook.com/lucann.info',
+      },
     };
   }
 

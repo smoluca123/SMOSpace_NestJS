@@ -53,6 +53,11 @@ export interface IInfoApiType {
   description: string;
   authorizationToken?: string;
   swagger: string;
+  contact: {
+    name: string;
+    email: string;
+    url: string;
+  };
 }
 
 export interface IRequestWithDecodedAccessToken extends Request {
