@@ -57,6 +57,7 @@ export interface IInfoApiType {
     name: string;
     email: string;
     url: string;
+    github: string;
   };
 }
 
