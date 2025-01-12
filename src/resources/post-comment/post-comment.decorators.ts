@@ -1,6 +1,8 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
+import { Roles } from 'src/decorators/roles.decorator';
+import { RolesLevel } from 'src/global/enums.global';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 
 export const createPostCommentDecorator = () =>
@@ -29,5 +31,27 @@ export const getPostCommentDecorator = () =>
       name: 'replyTo',
       required: false,
       description: 'Filter comments that are replies to a specific comment ID',
+    }),
+  );
+
+export const deletePostCommentDecorator = () =>
+  applyDecorators(
+    UseGuards(JwtTokenVerifyGuard),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+    ApiOperation({
+      summary: 'Delete post comment',
+      description: 'Delete a specific post comment',
+    }),
+  );
+
+export const deletePostCommentByAdminDecorator = () =>
+  applyDecorators(
+    Roles([RolesLevel.MANAGER]),
+    ApiOperation({
+      summary: 'Delete post comment by admin',
+      description: 'Delete a specific post comment by admin',
     }),
   );

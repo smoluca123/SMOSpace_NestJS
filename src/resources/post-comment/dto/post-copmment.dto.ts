@@ -7,7 +7,7 @@ export class CreatePostCommentDto {
   @IsNotEmpty()
   content: string;
 
-  @ApiPropertyOptional({ default: '' })
+  @ApiPropertyOptional({ default: '', required: false })
   @IsString()
   @IsOptional()
   replyToId?: string;

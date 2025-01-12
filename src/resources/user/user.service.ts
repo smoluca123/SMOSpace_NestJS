@@ -412,6 +412,7 @@ export class UserService {
     }>
   > {
     try {
+      if (!userId) throw new BadRequestException('User id is required');
       // Update the user's credits with the provided data.
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
@@ -456,6 +457,7 @@ export class UserService {
     }>
   > {
     try {
+      if (!userId) throw new BadRequestException('User id is required');
       // Update the user's credits by incrementing the current amount with the provided data.
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
@@ -837,6 +839,8 @@ export class UserService {
     >
   > {
     try {
+      if (!userId) throw new BadRequestException('User id is required');
+
       // Check if user exists
       const existedUser = await this.prisma.user.findUnique({
         where: { id: userId },

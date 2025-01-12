@@ -501,6 +501,10 @@ export class PostService {
     decodedAccessToken: IDecodedAccecssTokenType;
   }) {
     try {
+      if (!postId) {
+        throw new BadRequestException('Post id is required');
+      }
+
       const { userId } = decodedAccessToken;
 
       Object.keys(data).forEach((key) => {
@@ -557,6 +561,10 @@ export class PostService {
     data: UpdatePostAsAdminDto;
   }): Promise<IResponseType<PostDataType>> {
     try {
+      if (!postId) {
+        throw new BadRequestException('Post id is required');
+      }
+
       Object.keys(data).forEach((key) => {
         if (!data[key]) {
           if (typeof data[key] === 'boolean') {
@@ -616,9 +624,8 @@ export class PostService {
         throw new NotFoundException('User not found');
       }
 
-      // Check if user is the post author
       if (post.authorId !== userId) {
-        throw new ForbiddenException('Unauthorized');
+        throw new ForbiddenException('This comment is not yours');
       }
 
       // Delete post and decrement user's post count in a transaction

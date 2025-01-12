@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { handleDefaultError } from 'src/global/functions.global';
 import {
@@ -26,6 +31,10 @@ export class PostCommentService {
     data: CreatePostCommentDto;
   }): Promise<IResponseType<PostCommentDataType>> {
     try {
+      if (!postId) {
+        throw new BadRequestException('Post id is required');
+      }
+
       const postExist = await this.prisma.post.findUnique({
         where: {
           id: postId,
@@ -43,7 +52,7 @@ export class PostCommentService {
       if (replyToId) {
         parentComment = await this.prisma.postComment.findUnique({
           where: {
-            id: data.replyToId,
+            id: replyToId,
           },
           select: {
             id: true,
@@ -55,15 +64,10 @@ export class PostCommentService {
         }
       }
 
-      const [, , createdComment] = await this.prisma.$transaction([
+      const [, createdComment] = await this.prisma.$transaction([
         this.prisma.post.update({
           where: { id: postId },
           data: { commentCount: { increment: 1 } },
-          select: null,
-        }),
-        this.prisma.postComment.update({
-          where: { id: replyToId },
-          data: { repliesCount: { increment: 1 } },
           select: null,
         }),
         this.prisma.postComment.create({
@@ -76,6 +80,13 @@ export class PostCommentService {
           },
           select: postCommentDataSelect,
         }),
+        ...(replyToId && [
+          this.prisma.postComment.update({
+            where: { id: replyToId },
+            data: { repliesCount: { increment: 1 } },
+            select: null,
+          }),
+        ]),
       ]);
       return {
         message: 'Comment created successfully',
@@ -100,6 +111,10 @@ export class PostCommentService {
     replyTo: string;
   }): Promise<IPaginationResponseType<PostCommentDataType>> {
     try {
+      if (!postId) {
+        throw new BadRequestException('Post id is required');
+      }
+
       const postExist = await this.prisma.post.findUnique({
         where: {
           id: postId,
@@ -150,5 +165,167 @@ export class PostCommentService {
     } catch (error) {
       handleDefaultError(error);
     }
+  }
+
+  // async handleDeletePostComment({
+  //   commentId,
+  //   authorId,
+  // }: {
+  //   commentId: string;
+  //   authorId?: string;
+  // }) {
+  //   try {
+  //     if (!commentId) {
+  //       throw new BadRequestException('Comment id is required');
+  //     }
+
+  //     const commentExist = await this.prisma.postComment.findUnique({
+  //       where: {
+  //         id: commentId,
+  //       },
+  //       select: {
+  //         id: true,
+  //         postId: true,
+  //         repliesCount: true,
+  //         authorId: true,
+  //         post: {
+  //           select: {
+  //             commentCount: true,
+  //           },
+  //         },
+  //       },
+  //     });
+  //     if (!commentExist) {
+  //       throw new NotFoundException('Comment not found');
+  //     }
+
+  //     const {
+  //       postId,
+  //       post: { commentCount },
+  //     } = commentExist;
+
+  //     if (authorId) {
+  //       if (commentExist.authorId !== authorId) {
+  //         throw new ForbiddenException('This comment is not yours');
+  //       }
+  //     }
+  //     const [, deletedComment] = await this.prisma.$transaction([
+  //       this.prisma.post.update({
+  //         where: { id: postId },
+  //         data: {
+  //           commentCount: { decrement: commentCount > 0 ? 1 : 0 },
+  //         },
+  //         select: null,
+  //       }),
+  //       this.prisma.postComment.delete({
+  //         where: { id: commentId },
+  //         select: postCommentDataSelect,
+  //       }),
+  //     ]);
+  //     if (deletedComment.replyToId) {
+  //       const replyToComment = await this.prisma.postComment.findUnique({
+  //         where: { id: deletedComment.replyToId },
+  //         select: { id: true, repliesCount: true },
+  //       });
+  //       if (replyToComment) {
+  //         await this.prisma.postComment.update({
+  //           where: { id: deletedComment.replyToId },
+  //           data: {
+  //             repliesCount: {
+  //               decrement: replyToComment.repliesCount > 0 ? 1 : 0,
+  //             },
+  //           },
+  //           select: null,
+  //         });
+  //       }
+  //     }
+
+  //     return {
+  //       message: 'Comment deleted successfully',
+  //       data: deletedComment,
+  //       statusCode: 200,
+  //       date: new Date(),
+  //     };
+  //   } catch (error) {
+  //     console.log(error);
+  //     handleDefaultError(error);
+  //   }
+  // }
+
+  async handleDeletePostComment({
+    commentId,
+    authorId,
+  }: {
+    commentId: string;
+    authorId?: string;
+  }) {
+    try {
+      if (!commentId) {
+        throw new BadRequestException('Comment id is required');
+      }
+
+      const commentExist = await this.prisma.postComment.findUnique({
+        where: { id: commentId },
+        select: {
+          id: true,
+          postId: true,
+          authorId: true,
+          replyToId: true,
+        },
+      });
+
+      if (!commentExist) {
+        throw new NotFoundException('Comment not found');
+      }
+
+      if (authorId && commentExist.authorId !== authorId) {
+        throw new ForbiddenException('This comment is not yours');
+      }
+
+      // Combine all operations in a single transaction
+      const [, , deletedComment] = await this.prisma.$transaction([
+        this.prisma.post.update({
+          where: { id: commentExist.postId },
+          data: { commentCount: { decrement: 1 } },
+        }),
+
+        // Update parent comment's replies count if this is a reply
+        ...(commentExist.replyToId
+          ? [
+              this.prisma.postComment.update({
+                where: { id: commentExist.replyToId },
+                data: { repliesCount: { decrement: 1 } },
+              }),
+            ]
+          : []),
+        this.prisma.postComment.delete({
+          where: { id: commentId },
+          select: postCommentDataSelect,
+        }),
+      ]);
+
+      return {
+        message: 'Comment deleted successfully',
+        data: deletedComment,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deletePostComment({
+    commentId,
+    authorId,
+  }: {
+    commentId: string;
+    authorId: string;
+  }) {
+    return this.handleDeletePostComment({ commentId, authorId });
+  }
+
+  async deletePostCommentByAdmin({ commentId }: { commentId: string }) {
+    return this.handleDeletePostComment({ commentId });
   }
 }

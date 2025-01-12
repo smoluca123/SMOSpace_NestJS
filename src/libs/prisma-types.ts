@@ -120,6 +120,7 @@ export const postCommentDataSelect = {
   createdAt: true,
   updatedAt: true,
   repliesCount: true,
+  replyToId: true,
   post: {
     select: postDataSelect,
   },
