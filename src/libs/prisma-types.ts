@@ -27,10 +27,6 @@ export const userDataSelect = {
   avatar: true,
 } satisfies Prisma.UserSelect;
 
-// export const userDataWithFollowingSelect = {
-
-// } satisfies Prisma.UserSelect;
-
 export type UserDataType = Prisma.UserGetPayload<{
   select: typeof userDataSelect;
 }>;
@@ -60,10 +56,11 @@ export const postDataSelect = {
   isPrivate: true,
   createdAt: true,
   updatedAt: true,
+  likeCount: true,
+  commentCount: true,
   author: {
     select: userDataSelect,
   },
-  likeCount: true,
 } satisfies Prisma.PostSelect;
 
 export const postDataInclude = {
@@ -114,4 +111,22 @@ export const followDataSelect = {
 
 export type FollowDataType = Prisma.FollowGetPayload<{
   select: typeof followDataSelect;
+}>;
+
+export const postCommentDataSelect = {
+  id: true,
+  content: true,
+  level: true,
+  createdAt: true,
+  updatedAt: true,
+  post: {
+    select: postDataSelect,
+  },
+  author: {
+    select: userDataSelect,
+  },
+} satisfies Prisma.PostCommentSelect;
+
+export type PostCommentDataType = Prisma.PostCommentGetPayload<{
+  select: typeof postCommentDataSelect;
 }>;

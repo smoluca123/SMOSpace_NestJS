@@ -142,13 +142,14 @@ model ActiveCode {
 }
 
 model Post {
-  id        String   @id @default(uuid())
-  content   String
-  authorId  String   @map("author_id")
-  isPrivate Boolean  @map("is_private")
-  likeCount Int      @default(0) @map("like_count")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  content      String   @db.VarChar(8000)
+  authorId     String   @map("author_id")
+  isPrivate    Boolean  @map("is_private")
+  likeCount    Int      @default(0) @map("like_count")
+  commentCount Int      @default(0) @map("comment_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   author   User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
   likes    PostLike[]
@@ -187,15 +188,16 @@ model Follow {
 
 model PostComment {
   id        String   @id @default(uuid())
-  content   String
+  content   String   @db.VarChar(3000)
   postId    String   @map("post_id")
-  userId    String   @map("user_id")
+  authorId  String   @map("author_id")
   replyToId String?  @map("reply_to_id")
+  level     Int      @default(0) @map("level")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   post    Post          @relation(fields: [postId], references: [id], onDelete: Restrict)
-  user    User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
   replyTo PostComment?  @relation("CommentReplies", fields: [replyToId], references: [id], onDelete: Restrict)
   replies PostComment[] @relation("CommentReplies")
 
