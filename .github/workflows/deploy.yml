@@ -23,5 +23,6 @@ jobs:
           git pull origin main
           bun i
           pm2 stop smospace-be
+          bun prisma generate
           bun run build
           pm2 start smospace-be
