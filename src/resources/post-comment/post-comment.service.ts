@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { handleDefaultError } from 'src/global/functions.global';
-import { IResponseType } from 'src/interfaces/interfaces.global';
+import {
+  IPaginationResponseType,
+  IResponseType,
+} from 'src/interfaces/interfaces.global';
 import {
   postCommentDataSelect,
   PostCommentDataType,
@@ -51,10 +55,15 @@ export class PostCommentService {
         }
       }
 
-      const [, createdComment] = await this.prisma.$transaction([
+      const [, , createdComment] = await this.prisma.$transaction([
         this.prisma.post.update({
           where: { id: postId },
           data: { commentCount: { increment: 1 } },
+          select: null,
+        }),
+        this.prisma.postComment.update({
+          where: { id: replyToId },
+          data: { repliesCount: { increment: 1 } },
           select: null,
         }),
         this.prisma.postComment.create({
@@ -72,6 +81,67 @@ export class PostCommentService {
         message: 'Comment created successfully',
         data: createdComment,
         statusCode: 201,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getPostComments({
+    postId,
+    page = 1,
+    limit = 10,
+  }: {
+    postId: string;
+    page: number;
+    limit: number;
+  }): Promise<IPaginationResponseType<PostCommentDataType>> {
+    try {
+      const postExist = await this.prisma.post.findUnique({
+        where: {
+          id: postId,
+        },
+        select: {
+          id: true,
+        },
+      });
+      if (!postExist) {
+        throw new NotFoundException('Post not found');
+      }
+
+      const whereQuery: Prisma.PostCommentWhereInput = {
+        postId,
+      };
+
+      const [comments, totalCount] = await this.prisma.$transaction([
+        this.prisma.postComment.findMany({
+          where: whereQuery,
+          skip: (page - 1) * limit,
+          take: limit,
+          select: postCommentDataSelect,
+        }),
+        this.prisma.postComment.count({
+          where: whereQuery,
+        }),
+      ]);
+
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page * limit < totalCount;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      return {
+        message: 'Get comments successfully',
+        data: {
+          currentPage: page,
+          pageSize: limit,
+          totalPage,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          items: comments,
+        },
+        statusCode: 200,
         date: new Date(),
       };
     } catch (error) {

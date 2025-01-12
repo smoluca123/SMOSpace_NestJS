@@ -119,6 +119,7 @@ export const postCommentDataSelect = {
   level: true,
   createdAt: true,
   updatedAt: true,
+  repliesCount: true,
   post: {
     select: postDataSelect,
   },
