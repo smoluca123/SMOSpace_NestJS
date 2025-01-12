@@ -199,7 +199,7 @@ model PostComment {
 
   post    Post          @relation(fields: [postId], references: [id], onDelete: Restrict)
   author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  replyTo PostComment?  @relation("CommentReplies", fields: [replyToId], references: [id], onDelete: Restrict)
+  replyTo PostComment?  @relation("CommentReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies PostComment[] @relation("CommentReplies")
 
   @@map("post_comments")

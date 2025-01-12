@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -14,6 +15,8 @@ import { RoleGuard } from 'src/guards/role.guard';
 import { CreatePostCommentDto } from 'src/resources/post-comment/dto/post-copmment.dto';
 import {
   createPostCommentDecorator,
+  deletePostCommentByAdminDecorator,
+  deletePostCommentDecorator,
   getPostCommentDecorator,
 } from 'src/resources/post-comment/post-comment.decorators';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -61,5 +64,24 @@ export class PostCommentController {
       limit,
       replyTo,
     });
+  }
+
+  @Delete('/:commentId')
+  @deletePostCommentDecorator()
+  deletePostComment(
+    @Param('commentId') commentId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    const { userId } = decodedAccessToken;
+    return this.postCommentService.deletePostComment({
+      commentId,
+      authorId: userId,
+    });
+  }
+
+  @Delete('/admin/:commentId')
+  @deletePostCommentByAdminDecorator()
+  deletePostCommentByAdmin(@Param('commentId') commentId: string) {
+    return this.postCommentService.deletePostCommentByAdmin({ commentId });
   }
 }
