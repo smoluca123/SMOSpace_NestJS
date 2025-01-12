@@ -187,14 +187,15 @@ model Follow {
 }
 
 model PostComment {
-  id        String   @id @default(uuid())
-  content   String   @db.VarChar(3000)
-  postId    String   @map("post_id")
-  authorId  String   @map("author_id")
-  replyToId String?  @map("reply_to_id")
-  level     Int      @default(0) @map("level")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  content      String   @db.VarChar(3000)
+  postId       String   @map("post_id")
+  authorId     String   @map("author_id")
+  replyToId    String?  @map("reply_to_id")
+  repliesCount Int      @default(0) @map("replies_count")
+  level        Int      @default(0) @map("level")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   post    Post          @relation(fields: [postId], references: [id], onDelete: Restrict)
   author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
