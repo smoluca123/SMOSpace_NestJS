@@ -92,10 +92,12 @@ export class PostCommentService {
     postId,
     page = 1,
     limit = 10,
+    replyTo,
   }: {
     postId: string;
     page: number;
     limit: number;
+    replyTo: string;
   }): Promise<IPaginationResponseType<PostCommentDataType>> {
     try {
       const postExist = await this.prisma.post.findUnique({
@@ -112,6 +114,7 @@ export class PostCommentService {
 
       const whereQuery: Prisma.PostCommentWhereInput = {
         postId,
+        ...(replyTo && { replyToId: replyTo }),
       };
 
       const [comments, totalCount] = await this.prisma.$transaction([

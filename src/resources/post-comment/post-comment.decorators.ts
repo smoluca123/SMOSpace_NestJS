@@ -1,5 +1,5 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 
@@ -25,4 +25,9 @@ export const getPostCommentDecorator = () =>
         'Retrieve all comments for a specific post with pagination support',
     }),
     ApiQueryLimitAndPage(),
+    ApiQuery({
+      name: 'replyTo',
+      required: false,
+      description: 'Filter comments that are replies to a specific comment ID',
+    }),
   );

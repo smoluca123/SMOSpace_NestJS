@@ -46,6 +46,7 @@ export class PostCommentController {
   @getPostCommentDecorator()
   getPostComments(
     @Param('postId') postId: string,
+    @Query('replyTo') replyTo: string,
     @Query('page') _page: string,
     @Query('limit') _limit: string,
   ) {
@@ -54,6 +55,11 @@ export class PostCommentController {
       limit: parseInt(_limit),
     });
 
-    return this.postCommentService.getPostComments({ postId, page, limit });
+    return this.postCommentService.getPostComments({
+      postId,
+      page,
+      limit,
+      replyTo,
+    });
   }
 }
