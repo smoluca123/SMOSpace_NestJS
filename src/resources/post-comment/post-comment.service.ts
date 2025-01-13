@@ -19,10 +19,112 @@ import {
   CreatePostCommentDto,
   UpdatePostCommentDto,
 } from 'src/resources/post-comment/dto/post-copmment.dto';
+import { PostService } from 'src/resources/post/post.service';
 
 @Injectable()
 export class PostCommentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    // private readonly postService: PostService,
+    private readonly prisma: PrismaService,
+    private readonly postService: PostService,
+  ) {}
+
+  // async createPostComment({
+  //   authorId,
+  //   postId,
+  //   data,
+  // }: {
+  //   authorId: string;
+  //   postId: string;
+  //   data: CreatePostCommentDto;
+  // }): Promise<IResponseType<PostCommentDataType>> {
+  //   try {
+  //     if (!postId) {
+  //       throw new BadRequestException('Post id is required');
+  //     }
+
+  //     const MAX_COMMENT_LEVEL = 2;
+
+  //     const postExist = await this.prisma.post.findUnique({
+  //       where: {
+  //         id: postId,
+  //       },
+  //       select: {
+  //         id: true,
+  //       },
+  //     });
+  //     if (!postExist) {
+  //       throw new NotFoundException('Post not found');
+  //     }
+
+  //     const { content, replyToId } = data;
+  //     let parentComment: {
+  //       id: string;
+  //       level: number;
+  //       replyToId: string;
+  //     } | null = null;
+  //     if (replyToId) {
+  //       parentComment = await this.prisma.postComment.findUnique({
+  //         where: {
+  //           id: replyToId,
+  //         },
+  //         select: {
+  //           id: true,
+  //           level: true,
+  //           replyToId: true,
+  //         },
+  //       });
+  //       if (!parentComment) {
+  //         throw new NotFoundException('Parent comment not found');
+  //       }
+  //     }
+
+  //     const level = replyToId
+  //       ? parentComment.level < MAX_COMMENT_LEVEL
+  //         ? parentComment.level + 1
+  //         : parentComment.level
+  //       : 0;
+  //     const validReplyToId =
+  //       replyToId && level <= MAX_COMMENT_LEVEL
+  //         ? parentComment.replyToId
+  //         : null;
+
+  //     const [, createdComment] = await this.prisma.$transaction([
+  //       this.prisma.post.update({
+  //         where: { id: postId },
+  //         data: { commentCount: { increment: 1 } },
+  //         select: null,
+  //       }),
+  //       this.prisma.postComment.create({
+  //         data: {
+  //           content,
+  //           replyToId: validReplyToId,
+  //           postId,
+  //           authorId,
+  //           level,
+  //         },
+  //         select: postCommentDataSelect,
+  //       }),
+  //       ...(replyToId
+  //         ? [
+  //             this.prisma.postComment.update({
+  //               where: { id: replyToId },
+  //               data: { repliesCount: { increment: 1 } },
+  //               select: null,
+  //             }),
+  //           ]
+  //         : []),
+  //     ]);
+  //     return {
+  //       message: 'Comment created successfully',
+  //       data: createdComment,
+  //       statusCode: 201,
+  //       date: new Date(),
+  //     };
+  //   } catch (error) {
+  //     handleDefaultError(error);
+  //   }
+  // }
 
   async createPostComment({
     authorId,
@@ -34,38 +136,41 @@ export class PostCommentService {
     data: CreatePostCommentDto;
   }): Promise<IResponseType<PostCommentDataType>> {
     try {
-      if (!postId) {
-        throw new BadRequestException('Post id is required');
-      }
+      await this.postService.validatePost(postId);
 
-      const postExist = await this.prisma.post.findUnique({
-        where: {
-          id: postId,
-        },
-        select: {
-          id: true,
-        },
-      });
-      if (!postExist) {
-        throw new NotFoundException('Post not found');
-      }
+      const MAX_COMMENT_LEVEL = 2;
 
       const { content, replyToId } = data;
-      let parentComment: { id: string; level: number } | null = null;
-      if (replyToId) {
-        parentComment = await this.prisma.postComment.findUnique({
+
+      const parentComment =
+        replyToId &&
+        (await this.prisma.postComment.findUnique({
           where: {
             id: replyToId,
           },
           select: {
             id: true,
             level: true,
+            replyToId: true,
           },
-        });
-        if (!parentComment) {
-          throw new NotFoundException('Parent comment not found');
-        }
+        }));
+      if (replyToId && !parentComment) {
+        throw new NotFoundException('Comment you are replying to not found');
       }
+
+      // Simplified level and replyToId calculation
+      const level = !replyToId ? 0 : parentComment.level + 1;
+      const validLevel = Math.min(level, MAX_COMMENT_LEVEL);
+
+      const validReplyToId = replyToId
+        ? level > MAX_COMMENT_LEVEL
+          ? parentComment.replyToId
+          : level <= MAX_COMMENT_LEVEL && replyToId
+        : null;
+
+      // replyToId && level === MAX_COMMENT_LEVEL
+      //   ? parentComment.replyToId
+      //   : null;
 
       const [, createdComment] = await this.prisma.$transaction([
         this.prisma.post.update({
@@ -76,10 +181,10 @@ export class PostCommentService {
         this.prisma.postComment.create({
           data: {
             content,
-            replyToId: replyToId || null,
+            replyToId: validReplyToId,
             postId,
             authorId,
-            level: replyToId ? parentComment.level + 1 : 0,
+            level: validLevel,
           },
           select: postCommentDataSelect,
         }),

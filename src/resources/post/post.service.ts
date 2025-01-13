@@ -35,6 +35,26 @@ import {
 @Injectable()
 export class PostService {
   constructor(private readonly prisma: PrismaService) {}
+  async validatePost(postId: string) {
+    try {
+      if (!postId) {
+        throw new BadRequestException('Post id is required');
+      }
+
+      const post = await this.prisma.post.findUnique({
+        where: { id: postId },
+        select: { id: true },
+      });
+
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+      return post;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   async getPosts({
     keywords = '',
     limit,
