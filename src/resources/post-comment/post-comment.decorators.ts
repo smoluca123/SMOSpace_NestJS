@@ -34,6 +34,28 @@ export const getPostCommentDecorator = () =>
     }),
   );
 
+export const updatePostCommentDecorator = () =>
+  applyDecorators(
+    UseGuards(JwtTokenVerifyGuard),
+    ApiOperation({
+      summary: 'Update post comment',
+      description: 'Update a specific post comment',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+  );
+
+export const updatePostCommentByAdminDecorator = () =>
+  applyDecorators(
+    Roles([RolesLevel.MANAGER]),
+    ApiOperation({
+      summary: 'Update post comment by admin',
+      description: 'Update a specific post comment by admin',
+    }),
+  );
+
 export const deletePostCommentDecorator = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),

@@ -15,7 +15,10 @@ import {
   PostCommentDataType,
 } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreatePostCommentDto } from 'src/resources/post-comment/dto/post-copmment.dto';
+import {
+  CreatePostCommentDto,
+  UpdatePostCommentDto,
+} from 'src/resources/post-comment/dto/post-copmment.dto';
 
 @Injectable()
 export class PostCommentService {
@@ -80,13 +83,15 @@ export class PostCommentService {
           },
           select: postCommentDataSelect,
         }),
-        ...(replyToId && [
-          this.prisma.postComment.update({
-            where: { id: replyToId },
-            data: { repliesCount: { increment: 1 } },
-            select: null,
-          }),
-        ]),
+        ...(replyToId
+          ? [
+              this.prisma.postComment.update({
+                where: { id: replyToId },
+                data: { repliesCount: { increment: 1 } },
+                select: null,
+              }),
+            ]
+          : []),
       ]);
       return {
         message: 'Comment created successfully',
@@ -165,6 +170,84 @@ export class PostCommentService {
     } catch (error) {
       handleDefaultError(error);
     }
+  }
+
+  async handleUpdatePostComment({
+    commentId,
+    data,
+    authorId,
+  }: {
+    commentId: string;
+    data: UpdatePostCommentDto;
+    authorId?: string;
+  }): Promise<{ updatedComment: PostCommentDataType }> {
+    try {
+      if (!commentId) {
+        throw new BadRequestException('Comment id is required');
+      }
+
+      const commentExist = await this.prisma.postComment.findUnique({
+        where: { id: commentId },
+        select: { id: true, authorId: true },
+      });
+      if (!commentExist) {
+        throw new NotFoundException('Comment not found');
+      }
+
+      if (authorId && commentExist.authorId !== authorId) {
+        throw new ForbiddenException('This comment is not yours');
+      }
+
+      const updatedComment = await this.prisma.postComment.update({
+        where: { id: commentId },
+        data: { content: data.content },
+        select: postCommentDataSelect,
+      });
+      return { updatedComment };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async updatePostComment({
+    commentId,
+    data,
+    authorId,
+  }: {
+    commentId: string;
+    data: UpdatePostCommentDto;
+    authorId?: string;
+  }): Promise<IResponseType<PostCommentDataType>> {
+    const { updatedComment } = await this.handleUpdatePostComment({
+      commentId,
+      data,
+      authorId,
+    });
+    return {
+      message: 'Comment updated successfully',
+      data: updatedComment,
+      statusCode: 200,
+      date: new Date(),
+    };
+  }
+
+  async updatePostCommentByAdmin({
+    commentId,
+    data,
+  }: {
+    commentId: string;
+    data: UpdatePostCommentDto;
+  }): Promise<IResponseType<PostCommentDataType>> {
+    const { updatedComment } = await this.handleUpdatePostComment({
+      commentId,
+      data,
+    });
+    return {
+      message: 'Comment updated successfully',
+      data: updatedComment,
+      statusCode: 200,
+      date: new Date(),
+    };
   }
 
   // async handleDeletePostComment({
@@ -258,7 +341,7 @@ export class PostCommentService {
   }: {
     commentId: string;
     authorId?: string;
-  }) {
+  }): Promise<{ deletedComment: PostCommentDataType }> {
     try {
       if (!commentId) {
         throw new BadRequestException('Comment id is required');
@@ -283,10 +366,15 @@ export class PostCommentService {
       }
 
       // Combine all operations in a single transaction
-      const [, , deletedComment] = await this.prisma.$transaction([
+      const [, deletedComment] = await this.prisma.$transaction([
         this.prisma.post.update({
           where: { id: commentExist.postId },
           data: { commentCount: { decrement: 1 } },
+        }),
+
+        this.prisma.postComment.delete({
+          where: { id: commentExist.id },
+          select: postCommentDataSelect,
         }),
 
         // Update parent comment's replies count if this is a reply
@@ -298,18 +386,9 @@ export class PostCommentService {
               }),
             ]
           : []),
-        this.prisma.postComment.delete({
-          where: { id: commentId },
-          select: postCommentDataSelect,
-        }),
       ]);
 
-      return {
-        message: 'Comment deleted successfully',
-        data: deletedComment,
-        statusCode: 200,
-        date: new Date(),
-      };
+      return { deletedComment };
     } catch (error) {
       handleDefaultError(error);
     }
@@ -321,11 +400,32 @@ export class PostCommentService {
   }: {
     commentId: string;
     authorId: string;
-  }) {
-    return this.handleDeletePostComment({ commentId, authorId });
+  }): Promise<IResponseType<PostCommentDataType>> {
+    const { deletedComment } = await this.handleDeletePostComment({
+      commentId,
+      authorId,
+    });
+    return {
+      message: 'Comment deleted successfully',
+      data: deletedComment,
+      statusCode: 200,
+      date: new Date(),
+    };
   }
 
-  async deletePostCommentByAdmin({ commentId }: { commentId: string }) {
-    return this.handleDeletePostComment({ commentId });
+  async deletePostCommentByAdmin({
+    commentId,
+  }: {
+    commentId: string;
+  }): Promise<IResponseType<PostCommentDataType>> {
+    const { deletedComment } = await this.handleDeletePostComment({
+      commentId,
+    });
+    return {
+      message: 'Comment deleted successfully',
+      data: deletedComment,
+      statusCode: 200,
+      date: new Date(),
+    };
   }
 }

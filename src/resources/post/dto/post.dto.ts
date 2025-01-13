@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
 export class CreatePostDto {
   @ApiProperty({ default: '', required: true })
@@ -24,6 +24,6 @@ export class UpdatePostDto {
 
 export class UpdatePostAsAdminDto extends UpdatePostDto {
   @ApiProperty({ default: '' })
-  @IsString()
+  @IsUUID()
   authorId: string;
 }
