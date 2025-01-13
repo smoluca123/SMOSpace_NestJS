@@ -18,6 +18,8 @@ import { CacheModule, CacheStore } from '@nestjs/cache-manager';
 // import * as redisStore from 'cache-manager-redis-store';
 import { redisStore } from 'cache-manager-redis-yet';
 import { PostCommentModule } from 'src/resources/post-comment/post-comment.module';
+import { PostGatewayModule } from 'src/resources/gateways/post/post.module';
+import { AppGatewayModule } from 'src/resources/gateways/app.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -97,6 +99,8 @@ import { PostCommentModule } from 'src/resources/post-comment/post-comment.modul
     UserModule,
     PostCommentModule,
     PostModule,
+    AppGatewayModule,
+    PostGatewayModule,
   ],
   controllers: [AppController],
   providers: [
