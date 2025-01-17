@@ -1,24 +1,23 @@
-import {
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  OnGatewayInit,
-  WebSocketGateway,
-} from '@nestjs/websockets';
+import { RedisService } from '@liaoliaots/nestjs-redis';
+import { UseGuards } from '@nestjs/common';
+import { OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
+import { Redis } from 'ioredis';
 import { Socket } from 'socket.io';
+import { WsJwtGuard } from 'src/guards/ws-auth.guard';
 
-@WebSocketGateway()
-export class AppGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
-  afterInit() {
-    console.log('WebSocket Gateway has been initialized');
+@UseGuards(WsJwtGuard)
+@WebSocketGateway({
+  cors: {
+    origin: '*',
+  },
+})
+export class AppGateway implements OnGatewayConnection {
+  private redis: Redis | null;
+  constructor(private readonly redisService: RedisService) {
+    this.redis = this.redisService.getOrThrow();
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     console.log('Client connected:', client.id);
-  }
-
-  handleDisconnect(client: Socket) {
-    console.log('Client disconnected:', client.id);
   }
 }

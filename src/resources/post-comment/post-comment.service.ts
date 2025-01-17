@@ -15,6 +15,7 @@ import {
   PostCommentDataType,
 } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { CommentGateway } from 'src/resources/gateways/comment/comment.gateway';
 import {
   CreatePostCommentDto,
   UpdatePostCommentDto,
@@ -27,6 +28,7 @@ export class PostCommentService {
     // private readonly postService: PostService,
     private readonly prisma: PrismaService,
     private readonly postService: PostService,
+    private readonly commentGateway: CommentGateway,
   ) {}
 
   // async createPostComment({
@@ -198,6 +200,10 @@ export class PostCommentService {
             ]
           : []),
       ]);
+
+      // Emit new comment to all connected clients
+      this.commentGateway.emitNewComment(createdComment);
+
       return {
         message: 'Comment created successfully',
         data: createdComment,

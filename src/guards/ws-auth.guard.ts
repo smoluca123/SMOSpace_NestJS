@@ -23,6 +23,7 @@ export class WsJwtGuard extends AuthGuard('jwt') {
     if (err || !user) {
       throw new WsException('Unauthorized');
     }
+    // console.log(user);
     return user;
   }
 }
