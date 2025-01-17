@@ -45,17 +45,21 @@ export class UserGateway implements OnGatewayDisconnect {
   ) {
     const userId = client.data.user.id;
     const status = data.status || 'online';
-    await this.redis.hset('online:users', userId, JSON.stringify({ status }));
+    await this.redis.hset('users:online', userId, JSON.stringify({ status }));
     client.send({
       status: 'success',
       message: 'You are online',
-      data,
+      data: {
+        status,
+        ...data,
+      },
     });
   }
 
+  @UseGuards(WsJwtVerifyGuard)
   handleDisconnect(client: SocketWithUserAndDecodedAccessToken | Socket) {
     if (client.data.user) {
-      this.redis.hdel('online:users', client.data.user.id);
+      this.redis.hdel('users:online', client.data.user.id);
     }
   }
 }
