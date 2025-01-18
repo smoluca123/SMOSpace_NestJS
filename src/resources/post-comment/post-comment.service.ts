@@ -245,7 +245,7 @@ export class PostCommentService {
 
       const whereQuery: Prisma.PostCommentWhereInput = {
         postId,
-        ...(replyTo && { replyToId: replyTo }),
+        replyToId: replyTo || null,
       };
 
       const [comments, totalCount] = await this.prisma.$transaction([

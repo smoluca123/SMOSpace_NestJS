@@ -27,7 +27,6 @@ export class PostGateway implements OnGatewayConnection {
   }
 
   async emitNewPost(data: PostDataType) {
-    console.log('emitNewPost', data);
     this.server.emit('post:onNewPost', data);
   }
 }

@@ -344,7 +344,9 @@ export class PostService {
       ]);
 
       // Emit new post to all connected clients
-      this.postGateway.emitNewPost(post);
+      if (!post.isPrivate) {
+        this.postGateway.emitNewPost(post);
+      }
 
       return {
         message: 'Post created successfully',
