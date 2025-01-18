@@ -14,10 +14,10 @@ import { UserModule } from 'src/resources/user/user.module';
 import { PostModule } from 'src/resources/post/post.module';
 import { APP_GUARD } from '@nestjs/core';
 import cacheConfig from 'src/configs/cache.config';
-import { CacheModule, CacheStore } from '@nestjs/cache-manager';
 // import * as redisStore from 'cache-manager-redis-store';
-import { redisStore } from 'cache-manager-redis-yet';
 import { PostCommentModule } from 'src/resources/post-comment/post-comment.module';
+import { AppGatewayModule } from 'src/resources/gateways/app.module';
+import { RedisModule } from '@liaoliaots/nestjs-redis';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -62,33 +62,46 @@ import { PostCommentModule } from 'src/resources/post-comment/post-comment.modul
     //   }),
     // }),
 
-    CacheModule.registerAsync({
+    RedisModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      isGlobal: true,
-      useFactory: async (configService: ConfigService) => {
-        const store = await redisStore({
-          socket: {
-            host: configService.get('REDIS_HOST'),
-            port: configService.get('REDIS_PORT'),
-
-            reconnectStrategy: (retries) => {
-              if (retries > 10) {
-                return new Error('Không thể kết nối đến Redis sau 10 lần thử');
-              }
-              return 1000;
-            },
-          },
+      useFactory: async (configService: ConfigService) => ({
+        config: {
+          host: configService.get('REDIS_HOST'),
+          port: configService.get('REDIS_PORT'),
           password: configService.get('REDIS_PASSWORD'),
-        });
-
-        return {
-          store: store as CacheStore,
-          ttl: 300 * 1000, //5 minutes
-          max: 100,
-        };
-      },
+          db: 0,
+        },
+      }),
     }),
+
+    // CacheModule.registerAsync({
+    //   imports: [ConfigModule],
+    //   inject: [ConfigService],
+    //   isGlobal: true,
+    //   useFactory: async (configService: ConfigService) => {
+    //     const store = await redisStore({
+    //       socket: {
+    //         host: configService.get('REDIS_HOST'),
+    //         port: configService.get('REDIS_PORT'),
+
+    //         reconnectStrategy: (retries) => {
+    //           if (retries > 10) {
+    //             return new Error('Không thể kết nối đến Redis sau 10 lần thử');
+    //           }
+    //           return 1000;
+    //         },
+    //       },
+    //       password: configService.get('REDIS_PASSWORD'),
+    //     });
+
+    //     return {
+    //       store: store as CacheStore,
+    //       ttl: 300 * 1000, //5 minutes
+    //       max: 100,
+    //     };
+    //   },
+    // }),
 
     ThrottlerModule.forRoot([{ ttl: 2000, limit: 100, name: 'default' }]),
     JwtModuleCustom,
@@ -97,6 +110,7 @@ import { PostCommentModule } from 'src/resources/post-comment/post-comment.modul
     UserModule,
     PostCommentModule,
     PostModule,
+    AppGatewayModule,
   ],
   controllers: [AppController],
   providers: [

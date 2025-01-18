@@ -1,4 +1,4 @@
-import { Cache } from '@nestjs/cache-manager';
+import { RedisService } from '@liaoliaots/nestjs-redis';
 import {
   CanActivate,
   ExecutionContext,
@@ -6,17 +6,21 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Redis } from 'ioredis';
 import { Roles } from 'src/decorators/roles.decorator';
 import { IRequestWithDecodedAuthToken } from 'src/interfaces/interfaces.global';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class RoleGuard implements CanActivate {
+  private redis: Redis | null;
   constructor(
     private reflector: Reflector,
     private prisma: PrismaService,
-    private cacheService: Cache,
-  ) {}
+    private readonly redisService: RedisService,
+  ) {
+    this.redis = this.redisService.getOrThrow();
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const rolesLevel = this.reflector.get<number[]>(
@@ -33,7 +37,7 @@ export class RoleGuard implements CanActivate {
     } = request as IRequestWithDecodedAuthToken;
 
     const cacheKey = `role_${id}_${authCode}`;
-    let cachedRole: string | number = await this.cacheService.get(cacheKey);
+    let cachedRole: string | number = await this.redis.get(cacheKey);
 
     if (!cachedRole) {
       const auth = await this.prisma.authCode.findUnique({
@@ -47,7 +51,7 @@ export class RoleGuard implements CanActivate {
         throw new UnauthorizedException('Invalid authentication');
       }
 
-      await this.cacheService.set(cacheKey, auth.roleLevel);
+      await this.redis.set(cacheKey, auth.roleLevel);
 
       // await this.redisCache.set(cacheKey, auth.roleLevel, 10);
       cachedRole = auth.roleLevel;

@@ -1,5 +1,7 @@
+import { User } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Request } from 'express';
+import { Socket } from 'socket.io';
 import { UserDataType } from 'src/libs/prisma-types';
 
 export interface IResponseType<ResultDataType = null> {
@@ -86,3 +88,10 @@ export interface IWithAccessToken {
 export interface IUserDataWithAccessToken
   extends UserDataType,
     IWithAccessToken {}
+
+export interface SocketWithUserAndDecodedAccessToken extends Socket {
+  data: {
+    user: User;
+    decodedAccessToken: IDecodedAccecssTokenType;
+  };
+}

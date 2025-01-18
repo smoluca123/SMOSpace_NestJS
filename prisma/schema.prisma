@@ -78,6 +78,7 @@ model User {
   followers   Follow[]      @relation("Followers")
   comments    PostComment[]
 
+  @@index([username, email, type])
   @@map("users")
 }
 
@@ -126,6 +127,7 @@ model UserSession {
   expiresAt    DateTime @default(now()) @map("expires_at")
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, lastActivity, token])
   @@map("user_sessions")
 }
 
@@ -155,6 +157,7 @@ model Post {
   likes    PostLike[]
   comments PostComment[]
 
+  @@index([authorId, createdAt])
   @@map("posts")
 }
 
@@ -169,6 +172,7 @@ model PostLike {
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   // @@unique([userId, postId])
+  @@index([userId, postId])
   @@map("post_likes")
 }
 
@@ -183,6 +187,7 @@ model Follow {
   following User @relation("Followers", fields: [followingId], references: [id], onDelete: Restrict)
 
   @@unique([followerId, followingId])
+  @@index([followerId, followingId])
   @@map("follows")
 }
 
@@ -202,5 +207,6 @@ model PostComment {
   replyTo PostComment?  @relation("CommentReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies PostComment[] @relation("CommentReplies")
 
+  @@index([postId, authorId, replyToId, createdAt])
   @@map("post_comments")
 }

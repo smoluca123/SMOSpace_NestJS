@@ -26,6 +26,7 @@ import {
   // TrendingTopicType,
 } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { PostGateway } from 'src/resources/gateways/post/post.gateway';
 import {
   CreatePostDto,
   UpdatePostAsAdminDto,
@@ -34,7 +35,10 @@ import {
 
 @Injectable()
 export class PostService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly postGateway: PostGateway,
+  ) {}
   async validatePost(postId: string) {
     try {
       if (!postId) {
@@ -338,6 +342,12 @@ export class PostService {
           select: postDataSelect,
         }),
       ]);
+
+      // Emit new post to all connected clients
+      if (!post.isPrivate) {
+        this.postGateway.emitNewPost(post);
+      }
+
       return {
         message: 'Post created successfully',
         data: post,
