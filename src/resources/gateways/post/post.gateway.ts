@@ -1,4 +1,5 @@
 import { RedisService } from '@liaoliaots/nestjs-redis';
+import { UseGuards } from '@nestjs/common';
 import {
   OnGatewayConnection,
   WebSocketGateway,
@@ -6,8 +7,10 @@ import {
 } from '@nestjs/websockets';
 import { Redis } from 'ioredis';
 import { Server, Socket } from 'socket.io';
+import { WsJwtGuard } from 'src/guards/ws-auth.guard';
 import { PostDataType } from 'src/libs/prisma-types';
 
+@UseGuards(WsJwtGuard)
 @WebSocketGateway({
   cors: {
     origin: '*',
