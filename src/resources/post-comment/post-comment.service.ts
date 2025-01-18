@@ -190,10 +190,10 @@ export class PostCommentService {
           },
           select: postCommentDataSelect,
         }),
-        ...(replyToId
+        ...(validReplyToId
           ? [
               this.prisma.postComment.update({
-                where: { id: replyToId },
+                where: { id: validReplyToId },
                 data: { repliesCount: { increment: 1 } },
                 select: null,
               }),
