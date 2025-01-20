@@ -251,6 +251,7 @@ export class PostCommentService {
       const [comments, totalCount] = await this.prisma.$transaction([
         this.prisma.postComment.findMany({
           where: whereQuery,
+          orderBy: { createdAt: 'asc' },
           skip: (page - 1) * limit,
           take: limit,
           select: postCommentDataSelect,

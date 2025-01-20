@@ -23,6 +23,7 @@ import {
   getUserInformationDecorator,
   updateInformationDecorator,
   updateUserAvatarDecorator,
+  updateUserCoverImageDecorator,
   updateUserInformationDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
@@ -136,6 +137,26 @@ export class UserController {
     file: Express.Multer.File,
   ) {
     return this.userService.updateUserAvatar(userId, file);
+  }
+
+  @Post('/cover-image/:userId')
+  @updateUserCoverImageDecorator()
+  async updateUserCoverImage(
+    @Param('userId') userId: string,
+    @UploadedFile(
+      FileIsImageValidationPipe,
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: 1024 * 1024 * 5,
+            message: 'File size is too large, max 5MB',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.userService.updateUserCoverImage({ userId, file });
   }
 
   @Post('/credits/add/:userId')

@@ -49,6 +49,27 @@ export class UserService {
    * @param page Optional page number (default: 1)
    * @returns Promise containing paginated user data and metadata
    */
+
+  async validateUser<T = UserDataType>({
+    userId,
+    selectData,
+  }: {
+    userId: string;
+    selectData: Prisma.UserSelect;
+  }): Promise<T> {
+    try {
+      if (!userId) throw new BadRequestException('User ID is required');
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: selectData,
+      });
+      if (!user) throw new NotFoundException('User not found');
+      return user as T;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   async getAllUsers({
     keywords = '',
     limit = 10,
@@ -388,6 +409,37 @@ export class UserService {
       };
     } catch (error) {
       // Handle any errors that occur during the process.
+      handleDefaultError(error);
+    }
+  }
+
+  async updateUserCoverImage({
+    userId,
+    file,
+  }: {
+    userId: string;
+    file: Express.Multer.File;
+  }): Promise<IResponseType<UserDataType>> {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: null,
+      });
+
+      const { url } = await this.supabase.uploadFile(file);
+
+      const updatedUser = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { coverImage: url },
+        select: userDataSelect,
+      });
+      return {
+        message: 'Update user cover image successfully',
+        data: updatedUser,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
       handleDefaultError(error);
     }
   }

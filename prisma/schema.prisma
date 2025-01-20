@@ -51,6 +51,7 @@ model User {
   id             String    @id @default(uuid())
   username       String    @unique
   email          String    @unique
+  bio            String?   @db.VarChar(1000)
   fullName       String    @map("full_name")
   password       String?
   displayName    String?   @map("display_name")
@@ -59,6 +60,7 @@ model User {
   age            Int?
   refreshToken   String?   @map("refresh_token")
   avatar         String?
+  coverImage     String?   @map("cover_image")
   isActive       Boolean?  @default(false) @map("is_active")
   isVerified     Boolean?  @default(false) @map("is_verified")
   isBanned       Boolean?  @default(false) @map("is_banned")

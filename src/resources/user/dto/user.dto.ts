@@ -1,39 +1,59 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class UpdateProfileDto {
-  @ApiProperty({ default: '' })
+  @ApiPropertyOptional({ default: '' })
   @IsString()
+  @IsOptional()
   email: string;
-  @ApiProperty({ default: '' })
+  @ApiPropertyOptional({ default: '' })
   @IsString()
+  @IsOptional()
+  bio: string;
+  @ApiPropertyOptional({ default: '' })
+  @IsString()
+  @IsOptional()
   password: string;
-  @ApiProperty({ default: '' })
+  @ApiPropertyOptional({ default: '' })
   @IsString()
+  @IsOptional()
   fullName: string;
-  @ApiProperty({ default: '' })
+  @ApiPropertyOptional({ default: '' })
   @IsString()
+  @IsOptional()
   displayName: string;
-  @ApiProperty({ default: '' })
+  @ApiPropertyOptional({ default: '' })
   @IsString()
+  @IsOptional()
   phoneNumber: string;
-  @ApiProperty({ default: 0 })
+  @ApiPropertyOptional({ default: 0 })
   @IsNumber()
+  @IsOptional()
   age: number;
 }
 
 export class UpdateUserDto extends UpdateProfileDto {
-  @ApiProperty({ default: '' })
+  @ApiPropertyOptional({ default: '' })
   @IsString()
+  @IsOptional()
   type: string;
-  @ApiProperty({ default: false })
+  @ApiPropertyOptional({ default: false })
   @IsBoolean()
+  @IsOptional()
   isActive: boolean;
-  @ApiProperty({ default: false })
+  @ApiPropertyOptional({ default: false })
   @IsBoolean()
+  @IsOptional()
   isVerified: boolean;
-  @ApiProperty({ default: false })
+  @ApiPropertyOptional({ default: false })
   @IsBoolean()
+  @IsOptional()
   isBanned: boolean;
 }
 
@@ -52,6 +72,8 @@ export class UserAvatarUpdateDto {
   })
   file: Express.Multer.File;
 }
+
+export class UserCoverImageUpdateDto extends UserAvatarUpdateDto {}
 
 export class UserCreditsUpdateDto {
   @ApiProperty({ default: 0 })
