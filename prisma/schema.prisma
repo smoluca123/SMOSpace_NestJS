@@ -51,6 +51,7 @@ model User {
   id             String    @id @default(uuid())
   username       String    @unique
   email          String    @unique
+  bio            String?   @db.VarChar(1000)
   fullName       String    @map("full_name")
   password       String?
   displayName    String?   @map("display_name")
@@ -59,6 +60,7 @@ model User {
   age            Int?
   refreshToken   String?   @map("refresh_token")
   avatar         String?
+  coverImage     String?   @map("cover_image")
   isActive       Boolean?  @default(false) @map("is_active")
   isVerified     Boolean?  @default(false) @map("is_verified")
   isBanned       Boolean?  @default(false) @map("is_banned")
@@ -69,14 +71,15 @@ model User {
   followerCount  Int       @default(0) @map("follower_count")
   followingCount Int       @default(0) @map("following_count")
 
-  userType    UserType      @relation(fields: [type], references: [id], onDelete: Restrict)
-  UserSession UserSession[]
-  ActiveCode  ActiveCode[]
-  post        Post[]
-  postLike    PostLike[]
-  following   Follow[]      @relation("Following")
-  followers   Follow[]      @relation("Followers")
-  comments    PostComment[]
+  userType     UserType       @relation(fields: [type], references: [id], onDelete: Restrict)
+  UserSession  UserSession[]
+  ActiveCode   ActiveCode[]
+  post         Post[]
+  postLike     PostLike[]
+  following    Follow[]       @relation("Following")
+  followers    Follow[]       @relation("Followers")
+  comments     PostComment[]
+  Notification Notification[]
 
   @@index([username, email, type])
   @@map("users")
@@ -209,4 +212,25 @@ model PostComment {
 
   @@index([postId, authorId, replyToId, createdAt])
   @@map("post_comments")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  receiverId String   @map("receiver_id")
+  typeId     String   @map("type_id")
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  receiver User             @relation(fields: [receiverId], references: [id], onDelete: NoAction)
+  type     NotificationType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+
+  @@map("notifications")
+}
+
+model NotificationType {
+  id           String         @id @default(uuid())
+  type         String
+  Notification Notification[]
+
+  @@map("notification_types")
 }

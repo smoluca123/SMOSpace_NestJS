@@ -27,11 +27,13 @@ import {
   UserActiveByCodeDto,
 } from 'src/resources/user/dto/user.dto';
 import * as bcrypt from 'bcryptjs';
-import { SupabaseService } from 'src/supabase/supabase.service';
+import { SupabaseService } from 'src/services/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
 import { addMinutes, isPast } from 'date-fns';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { S3Service } from 'src/services/aws/s3/s3.service';
+import { IMAGE_PROCESS_OPTIONS } from 'src/constants/file.constants';
 
 @Injectable()
 export class UserService {
@@ -39,6 +41,7 @@ export class UserService {
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
     private readonly emailService: EmailService,
+    private readonly s3Service: S3Service,
   ) {}
 
   /**
@@ -49,6 +52,27 @@ export class UserService {
    * @param page Optional page number (default: 1)
    * @returns Promise containing paginated user data and metadata
    */
+
+  async validateUser<T = UserDataType>({
+    userId,
+    selectData,
+  }: {
+    userId: string;
+    selectData: Prisma.UserSelect;
+  }): Promise<T> {
+    try {
+      if (!userId) throw new BadRequestException('User ID is required');
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: selectData,
+      });
+      if (!user) throw new NotFoundException('User not found');
+      return user as T;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   async getAllUsers({
     keywords = '',
     limit = 10,
@@ -370,7 +394,14 @@ export class UserService {
       if (!checkUser) throw new NotFoundException('User not found');
 
       // Upload the file to the storage service and get the URL of the uploaded file.
-      const { url } = await this.supabase.uploadFile(file);
+      // const { url } = await this.supabase.uploadFile(file);
+
+      //Upload the file to the storage service and get the URL of the uploaded file.
+      const { url } = await this.s3Service.uploadFile(
+        file,
+        file.originalname,
+        {},
+      );
 
       // Update the user's avatar with the URL of the uploaded file.
       const updatedUser = await this.prisma.user.update({
@@ -388,6 +419,44 @@ export class UserService {
       };
     } catch (error) {
       // Handle any errors that occur during the process.
+      handleDefaultError(error);
+    }
+  }
+
+  async updateUserCoverImage({
+    userId,
+    file,
+  }: {
+    userId: string;
+    file: Express.Multer.File;
+  }): Promise<IResponseType<UserDataType>> {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: null,
+      });
+
+      // const { url } = await this.supabase.uploadFile(file);
+
+      //Upload the file to the storage service and get the URL of the uploaded file.
+      const { url } = await this.s3Service.uploadFile(
+        file,
+        file.originalname,
+        IMAGE_PROCESS_OPTIONS,
+      );
+
+      const updatedUser = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { coverImage: url },
+        select: userDataSelect,
+      });
+      return {
+        message: 'Update user cover image successfully',
+        data: updatedUser,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
       handleDefaultError(error);
     }
   }
