@@ -27,11 +27,13 @@ import {
   UserActiveByCodeDto,
 } from 'src/resources/user/dto/user.dto';
 import * as bcrypt from 'bcryptjs';
-import { SupabaseService } from 'src/supabase/supabase.service';
+import { SupabaseService } from 'src/services/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
 import { addMinutes, isPast } from 'date-fns';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { S3Service } from 'src/services/aws/s3/s3.service';
+import { IMAGE_PROCESS_OPTIONS } from 'src/constants/file.constants';
 
 @Injectable()
 export class UserService {
@@ -39,6 +41,7 @@ export class UserService {
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
     private readonly emailService: EmailService,
+    private readonly s3Service: S3Service,
   ) {}
 
   /**
@@ -391,7 +394,14 @@ export class UserService {
       if (!checkUser) throw new NotFoundException('User not found');
 
       // Upload the file to the storage service and get the URL of the uploaded file.
-      const { url } = await this.supabase.uploadFile(file);
+      // const { url } = await this.supabase.uploadFile(file);
+
+      //Upload the file to the storage service and get the URL of the uploaded file.
+      const { url } = await this.s3Service.uploadFile(
+        file,
+        file.originalname,
+        {},
+      );
 
       // Update the user's avatar with the URL of the uploaded file.
       const updatedUser = await this.prisma.user.update({
@@ -426,7 +436,14 @@ export class UserService {
         selectData: null,
       });
 
-      const { url } = await this.supabase.uploadFile(file);
+      // const { url } = await this.supabase.uploadFile(file);
+
+      //Upload the file to the storage service and get the URL of the uploaded file.
+      const { url } = await this.s3Service.uploadFile(
+        file,
+        file.originalname,
+        IMAGE_PROCESS_OPTIONS,
+      );
 
       const updatedUser = await this.prisma.user.update({
         where: { id: user.id },

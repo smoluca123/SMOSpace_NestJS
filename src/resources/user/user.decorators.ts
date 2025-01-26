@@ -8,9 +8,11 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { FILE_VALIDATION } from 'src/constants/file.constants';
 import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { Roles } from 'src/decorators/roles.decorator';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
+import { FileUploadInterceptor } from 'src/interceptors/file-upload.interceptor';
 import { RolesLevel } from 'src/interfaces/interfaces.global';
 
 import {
@@ -157,16 +159,20 @@ export const updateUserCoverImageDecorator = () =>
     }),
     UseInterceptors(
       FileInterceptor('file', {
-        limits: {
-          fileSize: 1024 * 1024 * 5, //5MB
-        },
-        fileFilter(req, file, cb) {
-          if (!file.mimetype.match('image/*')) {
-            cb(null, false);
-          } else {
-            cb(null, true);
-          }
-        },
+        // limits: {
+        //   fileSize: 1024 * 1024 * 5, //5MB
+        // },
+        // fileFilter(req, file, cb) {
+        //   if (!file.mimetype.match('image/*')) {
+        //     cb(null, false);
+        //   } else {
+        //     cb(null, true);
+        //   }
+        // },
+      }),
+      new FileUploadInterceptor({
+        maxSize: FILE_VALIDATION.IMAGE.MAX_SIZE,
+        allowedMimeTypes: [...FILE_VALIDATION.IMAGE.ALLOWED_TYPES],
       }),
     ),
   );
