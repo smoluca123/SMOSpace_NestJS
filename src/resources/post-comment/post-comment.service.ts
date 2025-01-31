@@ -16,6 +16,7 @@ import {
 } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CommentGateway } from 'src/resources/gateways/comment/comment.gateway';
+import { NotificationService } from 'src/resources/notification/notification.service';
 import {
   CreatePostCommentDto,
   UpdatePostCommentDto,
@@ -29,6 +30,7 @@ export class PostCommentService {
     private readonly prisma: PrismaService,
     private readonly postService: PostService,
     private readonly commentGateway: CommentGateway,
+    private readonly notification: NotificationService,
   ) {}
 
   // async createPostComment({
@@ -138,7 +140,7 @@ export class PostCommentService {
     data: CreatePostCommentDto;
   }): Promise<IResponseType<PostCommentDataType>> {
     try {
-      await this.postService.validatePost(postId);
+      const post = await this.postService.validatePost(postId);
 
       const MAX_COMMENT_LEVEL = 2;
 
@@ -154,6 +156,7 @@ export class PostCommentService {
             id: true,
             level: true,
             replyToId: true,
+            authorId: true,
           },
         }));
       if (replyToId && !parentComment) {
@@ -200,6 +203,29 @@ export class PostCommentService {
             ]
           : []),
       ]);
+
+      // Create notification for post author
+      if (post.author.id !== parentComment?.authorId) {
+        await this.notification.createCommentNotification({
+          postId,
+          commentId: createdComment.id,
+          senderId: authorId,
+          recipientId: post.author.id,
+          senderData: createdComment.author,
+        });
+      }
+
+      // Create notification for reply comment author
+      if (parentComment) {
+        await this.notification.createReplyCommentNotification({
+          postId,
+          commentId: createdComment.id,
+          replyCommentId: validReplyToId,
+          senderId: authorId,
+          recipientId: parentComment.authorId,
+          senderData: createdComment.author,
+        });
+      }
 
       // Emit new comment to all connected clients
       this.commentGateway.emitNewComment(createdComment);

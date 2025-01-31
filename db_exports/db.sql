@@ -12,7 +12,7 @@
  Target Server Version : 150008 (150008)
  File Encoding         : 65001
 
- Date: 23/01/2025 00:27:02
+ Date: 29/01/2025 15:34:10
 */
 
 
@@ -82,6 +82,47 @@ INSERT INTO "public"."follows" VALUES ('f21b2c56-a16e-4bb4-8c7b-0ad47b72d842', '
 INSERT INTO "public"."follows" VALUES ('03f88e03-76d6-4f5a-84fb-b1b2cb874c77', '9e0c791c-c424-43fa-9c48-d73b11796ec9', 'ba1b25ea-053b-4100-a4ad-a92959914eeb', '2025-01-07 04:34:43.148');
 INSERT INTO "public"."follows" VALUES ('7bb6671c-0a0d-4ae3-84a3-a8d14cf9281d', '9e0c791c-c424-43fa-9c48-d73b11796ec9', '084b617e-c89c-44ff-8dc9-7c1aa4f7730e', '2025-01-08 06:14:11.594');
 INSERT INTO "public"."follows" VALUES ('a46a3f6f-00fc-4ebc-8681-b4ea96b08b0e', '9e0c791c-c424-43fa-9c48-d73b11796ec9', 'd66d20e6-d9cc-4218-9de6-8eeae42ea9ca', '2025-01-08 09:07:05.047');
+INSERT INTO "public"."follows" VALUES ('a0c40316-d126-4112-81fa-03ac0a704ced', 'd66d20e6-d9cc-4218-9de6-8eeae42ea9ca', 'ba1b25ea-053b-4100-a4ad-a92959914eeb', '2025-01-27 11:40:28.984');
+
+-- ----------------------------
+-- Table structure for notification_types
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."notification_types";
+CREATE TABLE "public"."notification_types" (
+  "id" text COLLATE "pg_catalog"."default" NOT NULL,
+  "type" "public"."NotificationType_Type" NOT NULL
+)
+;
+
+-- ----------------------------
+-- Records of notification_types
+-- ----------------------------
+INSERT INTO "public"."notification_types" VALUES ('a804b1bb-e92d-448d-a3b4-cd648c0f7985', 'FOLLOW_USER');
+
+-- ----------------------------
+-- Table structure for notifications
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."notifications";
+CREATE TABLE "public"."notifications" (
+  "id" text COLLATE "pg_catalog"."default" NOT NULL,
+  "type_id" text COLLATE "pg_catalog"."default" NOT NULL,
+  "entity_type" "public"."EntityType",
+  "priority" "public"."NotificationPriority" NOT NULL DEFAULT 'NORMAL'::"NotificationPriority",
+  "is_read" bool NOT NULL DEFAULT false,
+  "is_deleted" bool NOT NULL DEFAULT false,
+  "content" jsonb,
+  "metadata" jsonb,
+  "recipient_id" text COLLATE "pg_catalog"."default" NOT NULL,
+  "sender_id" text COLLATE "pg_catalog"."default",
+  "created_at" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "read_at" timestamp(3)
+)
+;
+
+-- ----------------------------
+-- Records of notifications
+-- ----------------------------
+INSERT INTO "public"."notifications" VALUES ('2be3cdb5-6174-44f3-bf00-473377730692', 'a804b1bb-e92d-448d-a3b4-cd648c0f7985', 'FOLLOW', 'NORMAL', 'f', 'f', '{"title": "New Follower", "message": "lucan1 started following you"}', '{"follower": {"id": "a0c40316-d126-4112-81fa-03ac0a704ced", "avatar": "https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1731137327615_00002-1468083896.png", "fullName": "Luca Nguyen", "username": "lucan1"}}', 'ba1b25ea-053b-4100-a4ad-a92959914eeb', 'd66d20e6-d9cc-4218-9de6-8eeae42ea9ca', '2025-01-27 11:40:29.757', NULL);
 
 -- ----------------------------
 -- Table structure for post_comments
@@ -210,14 +251,14 @@ INSERT INTO "public"."user_sessions" VALUES ('5f45db0c-5771-401f-85a3-f20a285328
 INSERT INTO "public"."user_sessions" VALUES ('e0a11592-f4d5-4a6f-87d4-3d00238b0ad2', '6a31a93a-a961-48d6-963e-0645f99de8e4', 'localhost', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0', NULL, '2025-01-17 08:59:23.109', '2024-12-26 09:17:42.057', '2025-01-18 08:59:23.109', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTMxYTkzYS1hOTYxLTQ4ZDYtOTYzZS0wNjQ1Zjk5ZGU4ZTQiLCJ1c2VybmFtZSI6Imx1Y2FuMiIsImtleSI6IjQyMDE4NzY4LWQwNTEtNGM2OS05OTUyLTI2NmFkZDBhZWRkMSIsImlhdCI6MTczNzEwNDM2MiwiZXhwIjoxNzM3NzA5MTYyfQ.6qfdN5Y76mbit0XYmS1zoYXK3wQAEcZslKvDMoVn_4Q');
 INSERT INTO "public"."user_sessions" VALUES ('2184b5f1-178c-4b86-86e1-8455c65fc996', 'd66d20e6-d9cc-4218-9de6-8eeae42ea9ca', '116.111.184.185', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0', NULL, '2025-01-17 13:49:35.622', '2024-12-15 15:09:56.32', '2025-01-18 13:49:35.622', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkNjZkMjBlNi1kOWNjLTQyMTgtOWRlNi04ZWVhZTQyZWE5Y2EiLCJ1c2VybmFtZSI6Imx1Y2FuMSIsImtleSI6ImMzZDMzNmZjLWU4MmMtNDk5Mi04OGUxLTYwNWU1ZDczNDBhNyIsImlhdCI6MTczNzEyMTc3NSwiZXhwIjoxNzM3NzI2NTc1fQ.ZxXK8UrYPTKiYtmimOE1fmxyD5zRh_ViIpfFqiVI8Ng');
 INSERT INTO "public"."user_sessions" VALUES ('cfacea91-369c-400b-92b9-08a51d61f139', '49d9e3c0-ec00-48f0-86d3-293549c246dd', '104.28.205.73', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0', NULL, '2025-01-18 13:06:12.745', '2024-12-19 05:05:45.299', '2025-01-19 13:06:12.745', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0OWQ5ZTNjMC1lYzAwLTQ4ZjAtODZkMy0yOTM1NDljMjQ2ZGQiLCJ1c2VybmFtZSI6InllbnZ5ZGV0aHVvbmcyODA2Iiwia2V5IjoiM2M1Mzg5OTktMWI2Yi00MzhhLWIwMmEtYTg3OWUxNjYxNDc5IiwiaWF0IjoxNzM3MjA1NTcyLCJleHAiOjE3Mzc4MTAzNzJ9.MwSUIlPsieNWVC1YVGrxvrbKArMdhTiDsI4QUbLgdYo');
-INSERT INTO "public"."user_sessions" VALUES ('9ad2772d-b092-4736-93a1-68fff172d080', 'd66d20e6-d9cc-4218-9de6-8eeae42ea9ca', 'localhost', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0', NULL, '2025-01-20 08:04:01.584', '2025-01-20 08:04:01.587', '2025-01-21 08:04:01.584', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkNjZkMjBlNi1kOWNjLTQyMTgtOWRlNi04ZWVhZTQyZWE5Y2EiLCJ1c2VybmFtZSI6Imx1Y2FuMSIsImtleSI6ImQzYjhlNzExLTFmMGItNGQ2MC04NjAyLTEwY2JmYjllMTYxMSIsImlhdCI6MTczNzM2MDI0MSwiZXhwIjoxNzM3OTY1MDQxfQ._df6GwiWNCKr4tbdojxIujxsIE3GmqRvnIv7kvI6uY8');
 INSERT INTO "public"."user_sessions" VALUES ('8c04053c-f36c-4686-b1e7-c4497085eee3', '65904792-fdd5-45e3-a892-830a4640fd9b', '104.28.205.74', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0', NULL, '2025-01-21 08:03:27.191', '2025-01-21 08:03:27.194', '2025-01-22 08:03:27.191', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NTkwNDc5Mi1mZGQ1LTQ1ZTMtYTg5Mi04MzBhNDY0MGZkOWIiLCJ1c2VybmFtZSI6InllbnZ5ZGV0aHVvbmcyODA2MiIsImtleSI6ImU2MDBjMmRiLWE0ZDUtNGJiZC05MjZlLTYwYmEzOTY1N2ZiOSIsImlhdCI6MTczNzQ0NjYwNywiZXhwIjoxNzM4MDUxNDA3fQ.dpdE1orqiaKmW4OA9PHtTx7GwYHl_LHL_lEOLOmdqsc');
 INSERT INTO "public"."user_sessions" VALUES ('c1310ae5-5fc9-478d-aa2e-61b8ccb3532c', '49d9e3c0-ec00-48f0-86d3-293549c246dd', '171.252.154.61', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36', NULL, '2025-01-06 13:47:32.427', '2025-01-06 13:47:32.429', '2025-01-07 13:47:32.427', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0OWQ5ZTNjMC1lYzAwLTQ4ZjAtODZkMy0yOTM1NDljMjQ2ZGQiLCJ1c2VybmFtZSI6InllbnZ5ZGV0aHVvbmcyODA2Iiwia2V5IjoiYTcwNzY2MzItNmYyYi00NDkyLWI5NDktMTcwZDBkZjg0YWFkIiwiaWF0IjoxNzM2MTcxMjUyLCJleHAiOjE3MzY3NzYwNTJ9.bHuXfbJcITSOCaVj9qvAOjizbN8wU0rUWWfDGt1q3AE');
 INSERT INTO "public"."user_sessions" VALUES ('9fd5d505-786e-41c1-9177-f99d54936af3', '9e0c791c-c424-43fa-9c48-d73b11796ec9', '171.252.154.182', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36', NULL, '2025-01-18 07:43:41.217', '2025-01-18 07:43:41.219', '2025-01-19 07:43:41.217', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5ZTBjNzkxYy1jNDI0LTQzZmEtOWM0OC1kNzNiMTE3OTZlYzkiLCJ1c2VybmFtZSI6Inl1a2ljdXRlMTIzIiwia2V5IjoiZmRkM2ZkZTItZDA5YS00MTY0LTgxNjgtOGMwOTA5MGY5NjE5IiwiaWF0IjoxNzM3MTg2MjIxLCJleHAiOjE3Mzc3OTEwMjF9.eBzCo14wJvTsfpS1WkHELy_sp1sO5MTXoMpfZh5phuo');
 INSERT INTO "public"."user_sessions" VALUES ('fe20c941-ddb8-4bde-9996-3f5d1c05586e', '9e0c791c-c424-43fa-9c48-d73b11796ec9', '104.28.205.74', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0', NULL, '2025-01-18 14:36:18.736', '2024-12-17 14:43:31.961', '2025-01-19 14:36:18.736', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5ZTBjNzkxYy1jNDI0LTQzZmEtOWM0OC1kNzNiMTE3OTZlYzkiLCJ1c2VybmFtZSI6Inl1a2ljdXRlMTIzIiwia2V5IjoiOGE3YWE1MWMtOGYzMS00MWMwLWE1MDktY2NhMjgyYzY1NzQ5IiwiaWF0IjoxNzM3MjEwOTc4LCJleHAiOjE3Mzc4MTU3Nzh9.JBTRoBDTmzVPwKzXQ6nOeEvBdkz3I1grPxAGrt7Tiwk');
 INSERT INTO "public"."user_sessions" VALUES ('936fcfc2-5ba3-4dc0-a412-596acd50a32b', '49d9e3c0-ec00-48f0-86d3-293549c246dd', '171.252.154.134', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36', NULL, '2025-01-20 13:49:04.471', '2025-01-20 13:49:04.472', '2025-01-21 13:49:04.471', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0OWQ5ZTNjMC1lYzAwLTQ4ZjAtODZkMy0yOTM1NDljMjQ2ZGQiLCJ1c2VybmFtZSI6InllbnZ5ZGV0aHVvbmcyODA2Iiwia2V5IjoiMDgzNzRmYjEtMzAxMS00YWQ5LWEwNDMtMjllZTdjMTM1YzQwIiwiaWF0IjoxNzM3MzgwOTQ0LCJleHAiOjE3Mzc5ODU3NDR9.mPsyH_5zPScURD8Gi1LHBCGej3Bg4_7w8_KUnj36Ync');
 INSERT INTO "public"."user_sessions" VALUES ('3ca5c8a7-c795-476b-a477-69fbb50d1478', 'd66d20e6-d9cc-4218-9de6-8eeae42ea9ca', '116.111.185.105', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36', NULL, '2024-12-28 13:16:46.421', '2024-12-28 13:16:46.422', '2024-12-29 13:16:46.421', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkNjZkMjBlNi1kOWNjLTQyMTgtOWRlNi04ZWVhZTQyZWE5Y2EiLCJ1c2VybmFtZSI6Imx1Y2FuMSIsImtleSI6IjNkZTg4ODk5LTYwYmUtNDU2OS1iZTE2LWY0YTQ4NWY4MjE0NCIsImlhdCI6MTczNTM5MTgwNiwiZXhwIjoxNzM1OTk2NjA2fQ.gfDTobSy2Rjq_0IsFieE65j0MamPexz2lMzJMGMrxkM');
-INSERT INTO "public"."user_sessions" VALUES ('707dd640-5146-4567-8f27-75ed711e63ed', '9e0c791c-c424-43fa-9c48-d73b11796ec9', '104.28.205.73', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0', NULL, '2025-01-21 08:39:47.945', '2025-01-21 08:39:47.946', '2025-01-22 08:39:47.945', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5ZTBjNzkxYy1jNDI0LTQzZmEtOWM0OC1kNzNiMTE3OTZlYzkiLCJ1c2VybmFtZSI6Inl1a2ljdXRlMTIzIiwia2V5IjoiYWUyYzI2ZDYtMWE0OS00Y2E3LThkMjgtZThkNGY0ZTUzZDY3IiwiaWF0IjoxNzM3NDQ4Nzg3LCJleHAiOjE3MzgwNTM1ODd9.IuvxEfG4Kw0tVkKl09mjOh8xw6EGMG9Rl3mZtFyLtxU');
+INSERT INTO "public"."user_sessions" VALUES ('707dd640-5146-4567-8f27-75ed711e63ed', '9e0c791c-c424-43fa-9c48-d73b11796ec9', '171.252.155.241', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0', NULL, '2025-01-28 19:11:33.39', '2025-01-21 08:39:47.946', '2025-01-29 19:11:33.39', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5ZTBjNzkxYy1jNDI0LTQzZmEtOWM0OC1kNzNiMTE3OTZlYzkiLCJ1c2VybmFtZSI6Inl1a2ljdXRlMTIzIiwia2V5IjoiNWE3ZGJhZDktMjQ1YS00M2JjLWE3YTUtMTM5ODNkZTRhNWJlIiwiaWF0IjoxNzM4MDkxNDkzLCJleHAiOjE3Mzg2OTYyOTN9.jLy3sN8T-6AcRTLHRHpn3-W6ATAKuWjr2h15_MFWZdA');
+INSERT INTO "public"."user_sessions" VALUES ('9ad2772d-b092-4736-93a1-68fff172d080', 'd66d20e6-d9cc-4218-9de6-8eeae42ea9ca', 'localhost', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0', NULL, '2025-01-29 08:33:03.346', '2025-01-20 08:04:01.587', '2025-01-30 08:33:03.346', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkNjZkMjBlNi1kOWNjLTQyMTgtOWRlNi04ZWVhZTQyZWE5Y2EiLCJ1c2VybmFtZSI6Imx1Y2FuMSIsImtleSI6ImVhYWEyNGQxLTBiZDMtNGE0MC04OWFiLWI5NjEyOTU2OGJjYiIsImlhdCI6MTczODEzOTU4MywiZXhwIjoxNzM4NzQ0MzgzfQ.Vk50czVq_QDyHiGdXjV4tUWoUpAFKx-HqZnd3t8eaW0');
 
 -- ----------------------------
 -- Table structure for user_types
@@ -274,13 +315,13 @@ INSERT INTO "public"."users" VALUES ('02ad241e-66a7-4e44-99fd-36fced0ca386', 'de
 INSERT INTO "public"."users" VALUES ('9df351a4-a867-460f-9453-7105223b9e80', 'hgphienn', 'hgphien@gmail.com', 'pham tran hong phien', '$2a$10$VPmWSIXXHURJsQVUjTG5BO2XKGDeserf463Lq4Bw0tPXjFYanHzLe', '588b1a65-426a-468c-9365-dc1c9b851a79', '034444444', 19, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uSWQiOiJjMjI2MTMzNC03MThlLTRkMmItOThjNi0wMDhmZjU4YjQ0NjUiLCJ1c2VySWQiOiI5ZGYzNTFhNC1hODY3LTQ2MGYtOTQ1My03MTA1MjIzYjllODAiLCJ1c2VybmFtZSI6ImhncGhpZW5uIiwia2V5IjoiNjBhYzdkYzItMmUyMS00MTM2LWJhNDItYmIyY2I5N2UxZTJlIiwiaWF0IjoxNzMyMjY5MDk0LCJleHAiOjE3MzQ4NjEwOTR9.jSn-oaWPHzeqWjw2lAq1c58z42ZlNLzt5KpSOIvAwRw', NULL, 'f', 'f', 'f', '2024-11-22 09:51:32.629', '2024-12-28 09:29:25.501', 0.00, 1, 0, 0, NULL, NULL, NULL);
 INSERT INTO "public"."users" VALUES ('caa2265d-5196-4a67-831e-85f91866fb8b', 'kanjame', 'kanjame@gmail.com', 'Kan Jame', '$2a$10$hmzfMs28YHK46KQ8jcN4guxrObSsBL6hUSVsn/nwppUNIIe5DonuW', '588b1a65-426a-468c-9365-dc1c9b851a79', NULL, 0, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uSWQiOiI2ZjYwOTkzOS1jM2RlLTQ3M2ItYjcyMy00ZTQ2YWExNjE2ZWIiLCJ1c2VySWQiOiJjYWEyMjY1ZC01MTk2LTRhNjctODMxZS04NWY5MTg2NmZiOGIiLCJ1c2VybmFtZSI6ImthbmphbWUiLCJrZXkiOiJlN2UyMDkwNS0wNzJlLTRjNTItYjlkZS01NTYxYzEyYWQ2MzIiLCJpYXQiOjE3MzE0OTY0ODgsImV4cCI6MTczNDA4ODQ4OH0.EDsz6V5ET6JWif5-V1QtocnaPtRxD3s1y4obp6MCFoA', NULL, 'f', 'f', 'f', '2024-11-13 11:14:48.721', '2024-12-30 07:09:42.166', 0.00, 1, 0, 0, NULL, NULL, NULL);
 INSERT INTO "public"."users" VALUES ('37739086-9b6f-42ac-96ce-1cc81a56dd6d', 'yenvydethuong2806+2', 'ogyminecraft497+2@gmail.com', 'pham thi yen vy', '$2a$10$d8LtvWWPNC5Yi7u9Iscl2urGTH0VV18QZ4e.S0sBXpU01ziKZ.Byy', '588b1a65-426a-468c-9365-dc1c9b851a79', '0356618560', 0, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uSWQiOiJmYTQ5YmFiZS02NzZlLTQyMDQtODgyZC0xODcxZDYyNGM5MWEiLCJ1c2VySWQiOiIzNzczOTA4Ni05YjZmLTQyYWMtOTZjZS0xY2M4MWE1NmRkNmQiLCJ1c2VybmFtZSI6InllbnZ5ZGV0aHVvbmcyODA2KzIiLCJrZXkiOiIxNDlkZTQ5Ny0yNGUzLTRjNWItYWIxMC1mMTMxYTA2MDk2MDgiLCJpYXQiOjE3MzIzMzYwMTQsImV4cCI6MTczNDkyODAxNH0.z_8lobLg-kMlNPYb2JgsZfiaqTzFAE-1-XhAA4XzchA', NULL, 'f', 'f', 'f', '2024-11-23 04:26:53.327', '2025-01-06 07:28:40.003', 0.00, 1, 0, 0, NULL, NULL, NULL);
-INSERT INTO "public"."users" VALUES ('ba1b25ea-053b-4100-a4ad-a92959914eeb', 'lucan3', 'icaluca12+2@gmail.com', 'Kan Jame', '$2a$10$Rnfw5j96Z9X7hXS424b.D.F3o0wro1N.xm8cy/VDIgOmE2tXs5FNi', '588b1a65-426a-468c-9365-dc1c9b851a79', NULL, 0, NULL, NULL, 'f', 'f', 'f', '2024-12-06 15:33:49.042', '2025-01-07 04:34:43.148', 0.00, 1, 0, 0, NULL, NULL, NULL);
-INSERT INTO "public"."users" VALUES ('d66d20e6-d9cc-4218-9de6-8eeae42ea9ca', 'lucan1', 'icaluca12@gmail.com', 'Luca Nguyen', '$2b$10$fCvpEVrdjINF2mloEiISKu4Yo1wMveQkg5t/4IuHcqE3gm1dmgFVq', '588b1a65-426a-468c-9365-dc1c9b851a79', '0909090909', 25, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkNjZkMjBlNi1kOWNjLTQyMTgtOWRlNi04ZWVhZTQyZWE5Y2EiLCJ1c2VybmFtZSI6Imx1Y2FuMSIsImtleSI6ImQzYjhlNzExLTFmMGItNGQ2MC04NjAyLTEwY2JmYjllMTYxMSIsImlhdCI6MTczNzM2MDI0MSwiZXhwIjoxNzM5OTUyMjQxfQ.0s5h1MwVYjkPFGXgBAXeikfPWwqeEQMhjmPCcJ_1AbQ', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1731137327615_00002-1468083896.png', 'f', 't', 'f', '2024-11-04 18:19:27.651', '2025-01-20 14:18:50.332', 99950.00, 2, 1, 23, NULL, '<p>I am who i am</p>', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1737382729273_5987-shooting-stars-8-bit.gif');
 INSERT INTO "public"."users" VALUES ('49d9e3c0-ec00-48f0-86d3-293549c246dd', 'yenvydethuong2806', 'ogyminecraft497+1@gmail.com', 'Nana Haru', '$2a$10$7TYIFS8ZqDbn/.z6o9A2HuNY5G.6HxnM8.iEyKs3zsDkr4d6rsSyy', '588b1a65-426a-468c-9365-dc1c9b851a79', '0356618560', 19, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0OWQ5ZTNjMC1lYzAwLTQ4ZjAtODZkMy0yOTM1NDljMjQ2ZGQiLCJ1c2VybmFtZSI6InllbnZ5ZGV0aHVvbmcyODA2Iiwia2V5IjoiMDgzNzRmYjEtMzAxMS00YWQ5LWEwNDMtMjllZTdjMTM1YzQwIiwiaWF0IjoxNzM3MzgwOTQ0LCJleHAiOjE3Mzk5NzI5NDR9.qXfLZlxt0f18NhrrkZYFlIVQF73vDRhcebSvn_a0wZo', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1737210405917_photo_2024-03-11_12-05-44.jpg', 't', 'f', 'f', '2024-11-23 04:19:05.711', '2025-01-20 13:49:04.462', 2.20, 1, 2, 1, NULL, NULL, NULL);
-INSERT INTO "public"."users" VALUES ('9e0c791c-c424-43fa-9c48-d73b11796ec9', 'yukicute123', 'yukidev2k5@smoteam.com', 'Dang Yuki (Frontend Developer)', '$2a$10$aFlVH426/pzmmwrC.Te/jOtVfNz/OUtYNg1A08rPD94wn95F64vBK', '588b1a65-426a-468c-9365-dc1c9b851a79', '0356658758', 19, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5ZTBjNzkxYy1jNDI0LTQzZmEtOWM0OC1kNzNiMTE3OTZlYzkiLCJ1c2VybmFtZSI6Inl1a2ljdXRlMTIzIiwia2V5IjoiYWUyYzI2ZDYtMWE0OS00Y2E3LThkMjgtZThkNGY0ZTUzZDY3IiwiaWF0IjoxNzM3NDQ4Nzg3LCJleHAiOjE3NDAwNDA3ODd9.kho-8q3TEvUM6320JLXV48jF2JXDhNFwgxl_JQrs1hA', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1736431193291_438196156_1002248498129871_1016470206629337226_n.jpg', 't', 't', 'f', '2024-12-17 14:43:31.915', '2025-01-22 09:20:14.671', 5627.20, 3, 9, 12, 'devYuki', '<p><strong classname="bold"><em classname="italic">      SMO Team</em></strong><br>❤️LucaN/LeoN❤️</p>', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1737537614074_christmatebg.jpg');
 INSERT INTO "public"."users" VALUES ('084b617e-c89c-44ff-8dc9-7c1aa4f7730e', 'yenvydethuong28063', 'ogyminecraft497+4@gmail.com', 'pham thi yen vy', '$2a$10$2pTODRB0PCD9wvkTeGn68.1U5arkkBavuLlExIbLg0hzg05..0Wkq', '588b1a65-426a-468c-9365-dc1c9b851a79', '0356618560', 19, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwODRiNjE3ZS1jODljLTQ0ZmYtOGRjOS03YzFhYTRmNzczMGUiLCJ1c2VybmFtZSI6InllbnZ5ZGV0aHVvbmcyODA2MyIsImtleSI6ImViNzc1OTZkLWQ3MzAtNDhjNS04ZmI1LWMyYjU3NWQyODJmYSIsImlhdCI6MTczNjMwOTc5OCwiZXhwIjoxNzM4OTAxNzk4fQ.Nfeiwh6UEPlnyjd2kyOp-wwabURjTgUphRdROLVhOs0', NULL, 'f', 'f', 'f', '2024-11-29 02:56:03.329', '2025-01-08 06:14:11.594', 0.00, 1, 1, 0, NULL, NULL, NULL);
 INSERT INTO "public"."users" VALUES ('65904792-fdd5-45e3-a892-830a4640fd9b', 'yenvydethuong28062', 'ogyminecraft497+3@gmail.com', 'pham thi yen vy', '$2a$10$Jl8Pytx1EBPd0.fauD/qvOISkLnKBwpIIgBjT1n4H9dvbqC2GHn4m', '588b1a65-426a-468c-9365-dc1c9b851a79', '0356618560', 22, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NTkwNDc5Mi1mZGQ1LTQ1ZTMtYTg5Mi04MzBhNDY0MGZkOWIiLCJ1c2VybmFtZSI6InllbnZ5ZGV0aHVvbmcyODA2MiIsImtleSI6ImU2MDBjMmRiLWE0ZDUtNGJiZC05MjZlLTYwYmEzOTY1N2ZiOSIsImlhdCI6MTczNzQ0NjYwNywiZXhwIjoxNzQwMDM4NjA3fQ.8jp3tXjmt4slYtxQuPuWZ5FXy_WtFe7CYrCyWxzplX0', NULL, 'f', 'f', 'f', '2024-11-25 04:25:10.321', '2025-01-21 08:03:40.825', 0.00, 0, 0, 0, NULL, NULL, NULL);
 INSERT INTO "public"."users" VALUES ('6a31a93a-a961-48d6-963e-0645f99de8e4', 'lucan2', 'lucan2@gmail.com', 'Luca N', '$2b$10$E399bydm4h2sAFu2Q4zCBuU8azipGf2KDjLf.Id9VcxGf28Rnq2bS', '588b1a65-426a-468c-9365-dc1c9b851a79', '0909090909', 23, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTMxYTkzYS1hOTYxLTQ4ZDYtOTYzZS0wNjQ1Zjk5ZGU4ZTQiLCJ1c2VybmFtZSI6Imx1Y2FuMiIsImtleSI6IjQyMDE4NzY4LWQwNTEtNGM2OS05OTUyLTI2NmFkZDBhZWRkMSIsImlhdCI6MTczNzEwNDM2MiwiZXhwIjoxNzM5Njk2MzYyfQ.pUDFDTXC_YHkKbS10A2uz40iu0kdUDP8PhuzwhhYHMI', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1734971185363_Snaptik.app_744868353203508353820.jpg', 'f', 'f', 'f', '2024-11-06 09:49:03.576', '2025-01-17 09:03:05.977', 1.40, 1, 1, 4, NULL, NULL, NULL);
+INSERT INTO "public"."users" VALUES ('9e0c791c-c424-43fa-9c48-d73b11796ec9', 'yukicute123', 'yukidev2k5@smoteam.com', 'Dang Yuki (Frontend Developer)', '$2a$10$aFlVH426/pzmmwrC.Te/jOtVfNz/OUtYNg1A08rPD94wn95F64vBK', '588b1a65-426a-468c-9365-dc1c9b851a79', '0356658758', 19, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5ZTBjNzkxYy1jNDI0LTQzZmEtOWM0OC1kNzNiMTE3OTZlYzkiLCJ1c2VybmFtZSI6Inl1a2ljdXRlMTIzIiwia2V5IjoiNWE3ZGJhZDktMjQ1YS00M2JjLWE3YTUtMTM5ODNkZTRhNWJlIiwiaWF0IjoxNzM4MDkxNDkzLCJleHAiOjE3NDA2ODM0OTN9.kGHX2O0N2yiC2LMYzthUSAso6G1UltDFvgjEuuyQAx4', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1736431193291_438196156_1002248498129871_1016470206629337226_n.jpg', 't', 't', 'f', '2024-12-17 14:43:31.915', '2025-01-28 19:11:33.378', 5627.20, 3, 9, 12, 'devYuki', '<p><strong classname="bold"><em classname="italic">      SMO Team</em></strong><br>❤️LucaN/LeoN❤️</p>', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1737537614074_christmatebg.jpg');
+INSERT INTO "public"."users" VALUES ('ba1b25ea-053b-4100-a4ad-a92959914eeb', 'lucan3', 'icaluca12+2@gmail.com', 'Kan Jame', '$2a$10$Rnfw5j96Z9X7hXS424b.D.F3o0wro1N.xm8cy/VDIgOmE2tXs5FNi', '588b1a65-426a-468c-9365-dc1c9b851a79', NULL, 0, NULL, NULL, 'f', 'f', 'f', '2024-12-06 15:33:49.042', '2025-01-27 11:40:28.984', 0.00, 2, 0, 0, NULL, NULL, NULL);
+INSERT INTO "public"."users" VALUES ('d66d20e6-d9cc-4218-9de6-8eeae42ea9ca', 'lucan1', 'icaluca12@gmail.com', 'Luca Nguyen', '$2b$10$fCvpEVrdjINF2mloEiISKu4Yo1wMveQkg5t/4IuHcqE3gm1dmgFVq', '588b1a65-426a-468c-9365-dc1c9b851a79', '0909090909', 25, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkNjZkMjBlNi1kOWNjLTQyMTgtOWRlNi04ZWVhZTQyZWE5Y2EiLCJ1c2VybmFtZSI6Imx1Y2FuMSIsImtleSI6ImVhYWEyNGQxLTBiZDMtNGE0MC04OWFiLWI5NjEyOTU2OGJjYiIsImlhdCI6MTczODEzOTU4MywiZXhwIjoxNzQwNzMxNTgzfQ.BErYXfeUI_6z8tEdphab8nLLm3BuMjX5LW93fHBr1ZA', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1731137327615_00002-1468083896.png', 'f', 't', 'f', '2024-11-04 18:19:27.651', '2025-01-29 08:33:03.099', 99950.00, 2, 2, 23, NULL, '<p>I am who i am</p>', 'https://bmboosjxeycdzkofgsmx.supabase.co/storage/v1/object/public/Pinterrest_upload/1737382729273_5987-shooting-stars-8-bit.gif');
 
 -- ----------------------------
 -- Indexes structure for table active_codes
@@ -315,6 +356,43 @@ CREATE UNIQUE INDEX "follows_followerId_followingId_key" ON "public"."follows" U
 -- Primary Key structure for table follows
 -- ----------------------------
 ALTER TABLE "public"."follows" ADD CONSTRAINT "follows_pkey" PRIMARY KEY ("id");
+
+-- ----------------------------
+-- Indexes structure for table notification_types
+-- ----------------------------
+CREATE UNIQUE INDEX "notification_types_type_key" ON "public"."notification_types" USING btree (
+  "type" "pg_catalog"."enum_ops" ASC NULLS LAST
+);
+
+-- ----------------------------
+-- Primary Key structure for table notification_types
+-- ----------------------------
+ALTER TABLE "public"."notification_types" ADD CONSTRAINT "notification_types_pkey" PRIMARY KEY ("id");
+
+-- ----------------------------
+-- Indexes structure for table notifications
+-- ----------------------------
+CREATE INDEX "notifications_recipient_id_idx" ON "public"."notifications" USING btree (
+  "recipient_id" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
+);
+CREATE INDEX "notifications_recipient_id_sender_id_type_id_idx" ON "public"."notifications" USING btree (
+  "recipient_id" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST,
+  "sender_id" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST,
+  "type_id" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
+);
+CREATE UNIQUE INDEX "notifications_recipient_id_sender_id_type_id_key" ON "public"."notifications" USING btree (
+  "recipient_id" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST,
+  "sender_id" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST,
+  "type_id" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
+);
+CREATE INDEX "notifications_type_id_idx" ON "public"."notifications" USING btree (
+  "type_id" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
+);
+
+-- ----------------------------
+-- Primary Key structure for table notifications
+-- ----------------------------
+ALTER TABLE "public"."notifications" ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("id");
 
 -- ----------------------------
 -- Indexes structure for table post_comments
@@ -409,6 +487,13 @@ ALTER TABLE "public"."active_codes" ADD CONSTRAINT "active_codes_user_id_fkey" F
 -- ----------------------------
 ALTER TABLE "public"."follows" ADD CONSTRAINT "follows_followerId_fkey" FOREIGN KEY ("followerId") REFERENCES "public"."users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "public"."follows" ADD CONSTRAINT "follows_followingId_fkey" FOREIGN KEY ("followingId") REFERENCES "public"."users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- ----------------------------
+-- Foreign Keys structure for table notifications
+-- ----------------------------
+ALTER TABLE "public"."notifications" ADD CONSTRAINT "notifications_recipient_id_fkey" FOREIGN KEY ("recipient_id") REFERENCES "public"."users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."notifications" ADD CONSTRAINT "notifications_sender_id_fkey" FOREIGN KEY ("sender_id") REFERENCES "public"."users" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."notifications" ADD CONSTRAINT "notifications_type_id_fkey" FOREIGN KEY ("type_id") REFERENCES "public"."notification_types" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- ----------------------------
 -- Foreign Keys structure for table post_comments

@@ -47,7 +47,7 @@ export class PostService {
 
       const post = await this.prisma.post.findUnique({
         where: { id: postId },
-        select: { id: true },
+        select: postDataSelect,
       });
 
       if (!post) {
