@@ -25,7 +25,9 @@ export class NotificationGateway implements OnGatewayDisconnect {
   constructor() {}
 
   handleDisconnect(client: Socket) {
-    client.leave(`noti:to-${client.data.user.id}`);
+    if (client.data.user) {
+      client.leave(`noti:to-${client.data.user.id}`);
+    }
   }
 
   @UseGuards(WsJwtVerifyGuard)

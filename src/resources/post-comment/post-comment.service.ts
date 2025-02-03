@@ -492,6 +492,11 @@ export class PostCommentService {
           postId: true,
           authorId: true,
           replyToId: true,
+          post: {
+            select: {
+              commentCount: true,
+            },
+          },
         },
       });
 
@@ -507,7 +512,11 @@ export class PostCommentService {
       const [, deletedComment] = await this.prisma.$transaction([
         this.prisma.post.update({
           where: { id: commentExist.postId },
-          data: { commentCount: { decrement: 1 } },
+          data: {
+            commentCount: {
+              decrement: commentExist.post.commentCount > 0 ? 1 : 0,
+            },
+          },
         }),
 
         this.prisma.postComment.delete({
