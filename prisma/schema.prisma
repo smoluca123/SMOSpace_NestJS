@@ -71,15 +71,18 @@ model User {
   followerCount  Int       @default(0) @map("follower_count")
   followingCount Int       @default(0) @map("following_count")
 
-  userType     UserType       @relation(fields: [type], references: [id], onDelete: Restrict)
-  UserSession  UserSession[]
-  ActiveCode   ActiveCode[]
-  post         Post[]
-  postLike     PostLike[]
-  following    Follow[]       @relation("Following")
-  followers    Follow[]       @relation("Followers")
-  comments     PostComment[]
-  Notification Notification[]
+  userType    UserType      @relation(fields: [type], references: [id], onDelete: Restrict)
+  UserSession UserSession[]
+  ActiveCode  ActiveCode[]
+  post        Post[]
+  postLike    PostLike[]
+  following   Follow[]      @relation("Following")
+  followers   Follow[]      @relation("Followers")
+  comments    PostComment[]
+
+  // Notification relationships
+  notificationsSent     Notification[] @relation("NotificationSender")
+  notificationsReceived Notification[] @relation("NotificationRecipient")
 
   @@index([username, email, type])
   @@map("users")
@@ -214,22 +217,113 @@ model PostComment {
   @@map("post_comments")
 }
 
+// Enum cho notification types
+enum NotificationType_Type {
+  // Social Interactions
+  LIKE_POST
+  LIKE_COMMENT
+  LIKE_PHOTO
+  COMMENT_POST
+  REPLY_COMMENT
+  SHARE_POST
+  POST_MENTION
+  COMMENT_MENTION
+
+  // Friend/Follow Related
+  FRIEND_REQUEST
+  FRIEND_ACCEPT
+  FOLLOW_USER
+  FOLLOW_ACCEPT
+  UNFOLLOW_USER
+
+  // Group Related
+  GROUP_INVITE
+  GROUP_JOIN_REQUEST
+  GROUP_JOIN_ACCEPT
+  GROUP_POST
+  GROUP_ROLE_CHANGE
+
+  // Content Related
+  NEW_POST_FROM_FOLLOWING
+  POST_IN_GROUP
+  TAGGED_IN_POST
+  TAGGED_IN_PHOTO
+
+  // System Notifications
+  ACCOUNT_UPDATE
+  SECURITY_ALERT
+  PASSWORD_CHANGE
+  EMAIL_VERIFICATION
+  ACCOUNT_MILESTONE
+
+  // Message Related
+  NEW_MESSAGE
+  MESSAGE_REQUEST
+  MESSAGE_READ
+
+  // Event Related
+  EVENT_INVITE
+  EVENT_REMINDER
+  EVENT_CHANGE
+  EVENT_CANCELLED
+}
+
+// Entity types enum
+enum EntityType {
+  POST
+  COMMENT
+  PHOTO
+  USER
+  GROUP
+  EVENT
+  MESSAGE
+  FOLLOW
+}
+
+// Notification Priority
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 model Notification {
-  id         String   @id @default(uuid())
-  receiverId String   @map("receiver_id")
-  typeId     String   @map("type_id")
-  isRead     Boolean  @default(false) @map("is_read")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id     String @id @default(uuid())
+  typeId String @map("type_id")
 
-  receiver User             @relation(fields: [receiverId], references: [id], onDelete: NoAction)
-  type     NotificationType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  entityType EntityType? @map("entity_type")
 
+  // Priority and status
+  priority  NotificationPriority @default(NORMAL)
+  isRead    Boolean              @default(false) @map("is_read")
+  isDeleted Boolean              @default(false) @map("is_deleted")
+
+  // Content and metadata stored as JSON
+  content  Json?
+  metadata Json?
+
+  // Relations
+  recipientId String  @map("recipient_id")
+  recipient   User    @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  senderId    String? @map("sender_id")
+  sender      User?   @relation("NotificationSender", fields: [senderId], references: [id])
+
+  // Timestamps
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  type NotificationType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+
+  @@index([recipientId, senderId, typeId])
+  @@index([recipientId])
+  @@index([typeId])
   @@map("notifications")
 }
 
 model NotificationType {
-  id           String         @id @default(uuid())
-  type         String
+  id           String                @id @default(uuid())
+  type         NotificationType_Type @unique
   Notification Notification[]
 
   @@map("notification_types")

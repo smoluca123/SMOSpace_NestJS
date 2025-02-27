@@ -134,3 +134,28 @@ export const postCommentDataSelect = {
 export type PostCommentDataType = Prisma.PostCommentGetPayload<{
   select: typeof postCommentDataSelect;
 }>;
+
+export const notificationDataSelect = {
+  id: true,
+  isRead: true,
+  createdAt: true,
+  type: {
+    select: {
+      id: true,
+      type: true,
+    },
+  },
+  priority: true,
+  metadata: true,
+  content: true,
+  entityType: true,
+  recipientId: true,
+  readAt: true,
+  sender: {
+    select: userDataSelect,
+  },
+} satisfies Prisma.NotificationSelect;
+
+export type NotificationDataType = Prisma.NotificationGetPayload<{
+  select: typeof notificationDataSelect;
+}>;

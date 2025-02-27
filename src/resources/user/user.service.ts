@@ -34,6 +34,7 @@ import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { S3Service } from 'src/services/aws/s3/s3.service';
 import { IMAGE_PROCESS_OPTIONS } from 'src/constants/file.constants';
+import { NotificationService } from 'src/resources/notification/notification.service';
 
 @Injectable()
 export class UserService {
@@ -42,6 +43,7 @@ export class UserService {
     private readonly supabase: SupabaseService,
     private readonly emailService: EmailService,
     private readonly s3Service: S3Service,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -761,6 +763,13 @@ export class UserService {
               select: followDataSelect,
             }),
       ]);
+
+      // Send notification to the target user
+      await this.notificationService.createFollowNotification({
+        recipientId: userId,
+        senderId: followerUserId,
+        senderData: followResult.follower,
+      });
 
       // Return success response with updated follow data
       return {

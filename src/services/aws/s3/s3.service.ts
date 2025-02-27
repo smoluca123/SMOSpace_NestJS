@@ -90,7 +90,7 @@ export class S3Service {
 
     const fileType = await fileTypeFromBuffer(file.buffer);
 
-    if (fileType?.mime.startsWith('image/')) {
+    if (fileType?.mime.startsWith('image/') && fileType.mime !== 'image/gif') {
       processedBuffer = await this.processImage({
         buffer: file.buffer,
         options: imageOptions,

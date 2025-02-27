@@ -139,11 +139,12 @@ export class AuthService {
         phoneNumber,
       } = credentials;
       const checkUser = await this.prisma.user.findFirst({
-        where: { username },
+        where: { OR: [{ username }, { email }] },
       });
 
-      if (checkUser) throw new ConflictException('Username already exists');
-      if (checkUser && email === checkUser?.email)
+      if (checkUser && checkUser.username === username)
+        throw new ConflictException('Username already exists');
+      if (checkUser && checkUser.email === email)
         throw new ConflictException('Email already exists');
 
       /*   eslint-disable @typescript-eslint/no-unused-vars */

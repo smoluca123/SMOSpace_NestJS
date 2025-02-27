@@ -16,8 +16,8 @@ import { APP_GUARD } from '@nestjs/core';
 import cacheConfig from 'src/configs/cache.config';
 // import * as redisStore from 'cache-manager-redis-store';
 import { PostCommentModule } from 'src/resources/post-comment/post-comment.module';
-import { AppGatewayModule } from 'src/resources/gateways/app.module';
 import { RedisModule } from '@liaoliaots/nestjs-redis';
+import { NotificationModule } from 'src/resources/notification/notification.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -110,7 +110,8 @@ import { RedisModule } from '@liaoliaots/nestjs-redis';
     UserModule,
     PostCommentModule,
     PostModule,
-    AppGatewayModule,
+    // AppGatewayModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [
