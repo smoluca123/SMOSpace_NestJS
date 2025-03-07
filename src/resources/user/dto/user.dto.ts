@@ -1,11 +1,37 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
+
+export class UserAdditionalInfoDto {
+  @ApiPropertyOptional({ default: '' })
+  @IsString()
+  @IsOptional()
+  living: string;
+  @ApiPropertyOptional({ default: '' })
+  @IsString()
+  @IsOptional()
+  hometown: string;
+  @ApiPropertyOptional({ default: '' })
+  @IsString()
+  @IsOptional()
+  website: string;
+  @ApiPropertyOptional({ default: [] })
+  @IsArray()
+  @IsOptional()
+  jobs: string[];
+  @ApiPropertyOptional({ default: '' })
+  @IsString()
+  @IsOptional()
+  birthDate: string;
+}
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ default: '' })
@@ -36,6 +62,14 @@ export class UpdateProfileDto {
   @IsNumber()
   @IsOptional()
   age: number;
+  @ApiPropertyOptional({
+    type: UserAdditionalInfoDto,
+    description: 'Additional information about the user',
+  })
+  @Type(() => UserAdditionalInfoDto)
+  @IsObject()
+  @IsOptional()
+  additionalInfo: UserAdditionalInfoDto;
 }
 
 export class UpdateUserDto extends UpdateProfileDto {

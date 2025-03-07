@@ -52,6 +52,7 @@ model User {
   username       String    @unique
   email          String    @unique
   bio            String?   @db.VarChar(1000)
+  gender         String?   @map("gender")
   fullName       String    @map("full_name")
   password       String?
   displayName    String?   @map("display_name")
@@ -84,8 +85,25 @@ model User {
   notificationsSent     Notification[] @relation("NotificationSender")
   notificationsReceived Notification[] @relation("NotificationRecipient")
 
+  // Additional info
+  userAdditionalInfoId String?             @unique
+  additionalInfo       UserAdditionalInfo? @relation(fields: [userAdditionalInfoId], references: [id])
+
   @@index([username, email, type])
   @@map("users")
+}
+
+model UserAdditionalInfo {
+  id        String    @id @default(uuid())
+  userId    String    @unique @map("user_id")
+  living    String?   @map("living")
+  hometown  String?   @map("hometown")
+  website   String?   @map("website")
+  jobs      String[]  @map("jobs")
+  birthDate DateTime? @map("birth_date")
+  User      User?
+
+  @@map("user_additional_info")
 }
 
 // model user_type {

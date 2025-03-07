@@ -61,7 +61,7 @@ export class AuthService {
 
       const checkUser = await this.prisma.user.findFirst({
         where: { OR: [{ username }, { email: username }] },
-        include: { userType: true },
+        include: { userType: true, additionalInfo: true },
       });
 
       if (!checkUser) throw new NotFoundException('User not found');

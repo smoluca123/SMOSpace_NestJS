@@ -305,7 +305,14 @@ export class UserService {
         where: {
           id: decodedAccessToken.userId,
         },
-        data,
+        data: {
+          ...data,
+          additionalInfo: {
+            update: {
+              data: data.additionalInfo,
+            },
+          },
+        },
         select: userDataSelect,
       });
       // Throw an error if the user is not found.
@@ -353,7 +360,16 @@ export class UserService {
         where: {
           id: userId,
         },
-        data,
+        data: {
+          ...data,
+          additionalInfo: {
+            update: {
+              data: {
+                ...data.additionalInfo,
+              },
+            },
+          },
+        },
         select: userDataSelect,
       });
       // Throw an error if the user is not found.
