@@ -114,7 +114,7 @@ export class UserService {
           select: {
             ...userDataSelect,
             followers: {
-              where: { followerId },
+              where: { followerId: followerId || '' },
               select: { followerId: true },
             },
           },
@@ -125,6 +125,7 @@ export class UserService {
       const totalPage = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPage;
       const hasPreviousPage = !!totalCount && page > 1;
+      console.log(users);
       const result = users.map(({ followers, ...user }) => ({
         ...user,
         isFollowedByUser: followers?.length > 0 || false,
