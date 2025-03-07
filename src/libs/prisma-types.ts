@@ -5,6 +5,18 @@ export const userTypeDataSelect = {
   typeName: true,
 } satisfies Prisma.UserTypeSelect;
 
+export const userAdditionalInfoDataSelect = {
+  living: true,
+  hometown: true,
+  website: true,
+  jobs: true,
+  birthDate: true,
+} satisfies Prisma.UserAdditionalInfoSelect;
+
+export type UserAdditionalInfoDataType = Prisma.UserAdditionalInfoGetPayload<{
+  select: typeof userAdditionalInfoDataSelect;
+}>;
+
 export const userDataSelect = {
   id: true,
   username: true,
@@ -27,6 +39,9 @@ export const userDataSelect = {
   },
   avatar: true,
   coverImage: true,
+  additionalInfo: {
+    select: userAdditionalInfoDataSelect,
+  },
 } satisfies Prisma.UserSelect;
 
 export type UserDataType = Prisma.UserGetPayload<{

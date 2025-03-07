@@ -114,7 +114,7 @@ export class UserService {
           select: {
             ...userDataSelect,
             followers: {
-              where: { followerId },
+              where: { followerId: followerId || '' },
               select: { followerId: true },
             },
           },
@@ -125,6 +125,7 @@ export class UserService {
       const totalPage = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPage;
       const hasPreviousPage = !!totalCount && page > 1;
+      console.log(users);
       const result = users.map(({ followers, ...user }) => ({
         ...user,
         isFollowedByUser: followers?.length > 0 || false,
@@ -305,7 +306,14 @@ export class UserService {
         where: {
           id: decodedAccessToken.userId,
         },
-        data,
+        data: {
+          ...data,
+          additionalInfo: {
+            update: {
+              data: data.additionalInfo,
+            },
+          },
+        },
         select: userDataSelect,
       });
       // Throw an error if the user is not found.
@@ -353,7 +361,16 @@ export class UserService {
         where: {
           id: userId,
         },
-        data,
+        data: {
+          ...data,
+          additionalInfo: {
+            update: {
+              data: {
+                ...data.additionalInfo,
+              },
+            },
+          },
+        },
         select: userDataSelect,
       });
       // Throw an error if the user is not found.
