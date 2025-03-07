@@ -228,3 +228,18 @@ export const getFollowersDecorator = () =>
     UseGuards(JwtTokenVerifyGuard),
     ApiQueryLimitAndPage(),
   );
+
+export const getFollowingsDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get followings of current user',
+      description: 'Retrieve the followings of the authenticated user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+    ApiQueryLimitAndPage(),
+  );

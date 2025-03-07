@@ -82,6 +82,21 @@ export class UserController {
     });
   }
 
+  @Get('/followings')
+  @getFollowersDecorator()
+  async getFollowings(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('page') _page: string,
+    @Query('limit') _limit: string,
+  ) {
+    const { userId } = decodedAccessToken;
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.userService.getFollowings({ userId, limit, page });
+  }
+
   @Get('/')
   @getAllUsersDecorator()
   async getAllUsers(

@@ -1016,4 +1016,134 @@ export class UserService {
       handleDefaultError(error);
     }
   }
+
+  // async getFollowings({
+  //   userId,
+  //   limit = 10,
+  //   page = 1,
+  // }: {
+  //   userId: string;
+  //   limit?: number;
+  //   page?: number;
+  // }): Promise<IPaginationResponseType<UserDataWithIsFollowedType[]>> {
+  //   try {
+  //     const user = await this.validateUser({
+  //       userId,
+  //       selectData: null,
+  //     });
+
+  //     const whereQuery: Prisma.FollowWhereInput = {
+  //       followerId: user.id,
+  //     };
+
+  //     const followings = await this.prisma.follow.findMany({
+  //       where: whereQuery,
+  //       select: followDataSelect,
+  //     });
+  //     return {
+  //       message: 'Get followings successfully',
+  //       data: followings,
+  //       statusCode: 200,
+  //       date: new Date(),
+  //     };
+  //   } catch (error) {
+  //     handleDefaultError(error);
+  //   }
+  // }
+
+  async getFollowings({
+    userId,
+    limit = 10,
+    page = 1,
+  }: {
+    userId: string;
+    limit?: number;
+    page?: number;
+  }): Promise<
+    IPaginationResponseType<
+      Omit<FollowDataType, 'follower'> & {
+        following: UserDataWithIsFollowedType;
+      }
+    >
+  > {
+    try {
+      // Validate user ID is provided
+      if (!userId) throw new BadRequestException('User ID is required');
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { follower, ...filledFollowData } = followDataSelect;
+
+      // Build where query to get followers of specified user
+      const whereQuery: Prisma.FollowWhereInput = {
+        followerId: userId,
+      };
+
+      // Execute transaction to get total count and followers data
+      const [totalCount, followings] = await this.prisma.$transaction([
+        // Get total number of followers
+        this.prisma.follow.count({ where: whereQuery }),
+        // Get paginated followers with their follow status
+        this.prisma.follow.findMany({
+          where: whereQuery,
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            ...filledFollowData,
+            following: {
+              select: {
+                ...userDataSelect,
+                // Check if the user follows back
+                following: {
+                  where: {
+                    followerId: userId,
+                  },
+                  select: {
+                    id: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+      // Calculate pagination metadata
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPage;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      // Transform followers data to include isFollowedByUser flag
+      const items = followings.map((followingItem) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { following, ...followingData } = followingItem.following;
+
+        return {
+          ...followingItem,
+          following: {
+            ...followingData,
+            isFollowedByUser: true,
+          },
+        };
+      });
+
+      // Return success response with pagination and followers data
+      return {
+        message: 'Get followers successfully',
+        data: {
+          currentPage: page,
+          totalCount,
+          totalPage,
+          pageSize: limit,
+          hasNextPage,
+          hasPreviousPage,
+          items,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
 }
