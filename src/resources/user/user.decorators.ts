@@ -229,6 +229,18 @@ export const getFollowersDecorator = () =>
     ApiQueryLimitAndPage(),
   );
 
+export const getFollowingsByIdDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get followings of a user',
+      description: 'Retrieve the followings of a specific user',
+    }),
+    ApiParam({
+      name: 'userId',
+      description: 'ID of the user whose followings will be retrieved',
+    }),
+    ApiQueryLimitAndPage(),
+  );
 export const getFollowingsDecorator = () =>
   applyDecorators(
     ApiOperation({
