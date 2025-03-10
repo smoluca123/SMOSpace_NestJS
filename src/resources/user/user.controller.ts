@@ -19,6 +19,8 @@ import {
   getAllUsersDecorator,
   getFollowersByIdDecorator,
   getFollowersDecorator,
+  getFollowingsByIdDecorator,
+  getFollowingsDecorator,
   getInformationDecorator,
   getUserInformationDecorator,
   updateInformationDecorator,
@@ -80,6 +82,35 @@ export class UserController {
       page,
       followerId,
     });
+  }
+
+  @Get('/followings')
+  @getFollowingsDecorator()
+  async getFollowings(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('page') _page: string,
+    @Query('limit') _limit: string,
+  ) {
+    const { userId } = decodedAccessToken;
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.userService.getFollowings({ userId, limit, page });
+  }
+
+  @Get('/followings/:userId')
+  @getFollowingsByIdDecorator()
+  async getFollowingsById(
+    @Param('userId') userId: string,
+    @Query('page') _page: string,
+    @Query('limit') _limit: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.userService.getFollowings({ userId, limit, page });
   }
 
   @Get('/')
