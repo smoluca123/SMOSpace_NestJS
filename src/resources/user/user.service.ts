@@ -309,8 +309,17 @@ export class UserService {
         data: {
           ...data,
           additionalInfo: {
-            update: {
-              data: data.additionalInfo,
+            upsert: {
+              create: {
+                ...data.additionalInfo,
+                userId: decodedAccessToken.userId,
+              },
+              update: {
+                ...data.additionalInfo,
+              },
+              where: {
+                userId: decodedAccessToken.userId,
+              },
             },
           },
         },
