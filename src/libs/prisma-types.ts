@@ -8,7 +8,7 @@ export const userTypeDataSelect = {
 export const userAdditionalInfoDataSelect = {
   living: true,
   hometown: true,
-  website: true,
+  websites: true,
   jobs: true,
   birthDate: true,
 } satisfies Prisma.UserAdditionalInfoSelect;

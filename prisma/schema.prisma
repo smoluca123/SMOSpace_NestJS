@@ -98,7 +98,7 @@ model UserAdditionalInfo {
   userId    String    @unique @map("user_id")
   living    String?   @map("living")
   hometown  String?   @map("hometown")
-  website   String?   @map("website")
+  websites  String[]  @map("websites")
   jobs      String[]  @map("jobs")
   birthDate DateTime? @map("birth_date")
   User      User?
