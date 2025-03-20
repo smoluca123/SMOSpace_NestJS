@@ -51,7 +51,7 @@ export const processDataObject = async <T>(data: T): Promise<T> => {
     else if (
       typeof value !== 'boolean' &&
       typeof value !== 'number' &&
-      (value === null || value === undefined || value === '')
+      (value === null || value === undefined)
     ) {
       processedData[key] = undefined;
     }
