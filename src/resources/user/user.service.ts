@@ -7,6 +7,7 @@ import {
 import {
   generateSecureVerificationCode,
   handleDefaultError,
+  processDataObject,
 } from 'src/global/functions.global';
 import {
   IDecodedAccecssTokenType,
@@ -26,7 +27,6 @@ import {
   UpdateProfileDto,
   UserActiveByCodeDto,
 } from 'src/resources/user/dto/user.dto';
-import * as bcrypt from 'bcryptjs';
 import { SupabaseService } from 'src/services/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
 import { addMinutes, isPast } from 'date-fns';
@@ -287,36 +287,24 @@ export class UserService {
   async updateInformation(
     decodedAccessToken: IDecodedAccecssTokenType,
     data: UpdateProfileDto,
-  ) {
+  ): Promise<IResponseType<UserDataType>> {
     try {
       // Iterate through each key in the data object to process the values.
-      Object.keys(data).forEach(async (key) => {
-        // If the value is not a boolean and is empty, set it to undefined.
-        if (!data[key]) {
-          data[key] = undefined;
-          return;
-        }
-        // If the key is 'password', hash the value before updating.
-        if (key === 'password') {
-          data[key] = await bcrypt.hash(data[key], 10);
-        }
-      });
+      const processedData = await processDataObject(data);
       // Update the user with the processed data.
       const user = await this.prisma.user.update({
         where: {
           id: decodedAccessToken.userId,
         },
         data: {
-          ...data,
+          ...processedData,
           additionalInfo: {
             upsert: {
               create: {
-                ...data.additionalInfo,
+                ...processedData.additionalInfo,
                 userId: decodedAccessToken.userId,
               },
-              update: {
-                ...data.additionalInfo,
-              },
+              update: processedData.additionalInfo,
               where: {
                 userId: decodedAccessToken.userId,
               },
@@ -354,28 +342,51 @@ export class UserService {
       if (!userId) throw new BadRequestException('User ID is required');
 
       // Iterate through each key in the data object to process the values.
-      Object.keys(data).forEach(async (key) => {
-        // If the value is not a boolean and is empty, set it to undefined.
-        if (typeof data[key] !== 'boolean' && !data[key]) {
-          data[key] = undefined;
-          return;
-        }
-        // If the key is 'password', hash the value before updating.
-        if (key === 'password') {
-          data[key] = await bcrypt.hash(data[key], 10);
-        }
+      const processedData = await processDataObject(data);
+
+      const { additionalInfo, ...restData } = processedData;
+
+      let userAdditionalInfo = await this.prisma.userAdditionalInfo.findUnique({
+        where: {
+          userId: userId,
+        },
+        select: {
+          id: true,
+        },
       });
+
+      if (!userAdditionalInfo) {
+        userAdditionalInfo = await this.prisma.userAdditionalInfo.create({
+          data: {
+            userId: userId,
+            ...additionalInfo,
+          },
+        });
+
+        await this.prisma.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            userAdditionalInfoId: userAdditionalInfo.id,
+          },
+        });
+      }
+
       // Update the user with the processed data.
       const user = await this.prisma.user.update({
         where: {
           id: userId,
         },
         data: {
-          ...data,
+          ...restData,
           additionalInfo: {
             update: {
               data: {
-                ...data.additionalInfo,
+                ...additionalInfo,
+              },
+              where: {
+                userId: userId,
               },
             },
           },

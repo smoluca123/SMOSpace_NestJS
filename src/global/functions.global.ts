@@ -1,5 +1,7 @@
 import * as crypto from 'crypto';
 
+import * as bcrypt from 'bcryptjs';
+
 import { BadRequestException } from '@nestjs/common';
 
 export const handleDefaultError = (error: any) => {
@@ -17,3 +19,43 @@ export function sanitizeFileName(fileName) {
 export function generateSecureVerificationCode() {
   return crypto.randomBytes(3).toString('hex').toUpperCase();
 }
+
+export const processDataObject = async <T>(data: T): Promise<T> => {
+  // Kiểm tra null/undefined hoặc không phải object
+  if (!data || typeof data !== 'object') return data;
+
+  // Xử lý riêng cho array
+  if (Array.isArray(data)) {
+    const processedArray = await Promise.all(
+      (data as any[]).map((item) => processDataObject(item)),
+    );
+    return processedArray as any;
+  }
+
+  const processedData = { ...data };
+
+  for (const key of Object.keys(processedData)) {
+    const value = processedData[key];
+
+    // Xử lý object con (không phải null và là object)
+    if (value && typeof value === 'object') {
+      processedData[key] = await processDataObject(value);
+      continue;
+    }
+
+    // Xử lý password
+    if (key === 'password' && value) {
+      processedData[key] = await bcrypt.hash(value, 10);
+    }
+    // Chỉ set undefined cho null/undefined
+    else if (
+      typeof value !== 'boolean' &&
+      typeof value !== 'number' &&
+      (value === null || value === undefined)
+    ) {
+      processedData[key] = undefined;
+    }
+  }
+
+  return processedData;
+};

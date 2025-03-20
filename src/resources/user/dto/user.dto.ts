@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsDate,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -19,18 +20,18 @@ export class UserAdditionalInfoDto {
   @IsString()
   @IsOptional()
   hometown: string;
-  @ApiPropertyOptional({ default: '' })
-  @IsString()
+  @ApiPropertyOptional({ default: [] })
+  @IsArray()
   @IsOptional()
-  website: string;
+  websites: string[];
   @ApiPropertyOptional({ default: [] })
   @IsArray()
   @IsOptional()
   jobs: string[];
   @ApiPropertyOptional({ default: '' })
-  @IsString()
+  @IsDate()
   @IsOptional()
-  birthDate: string;
+  birthDate: Date;
 }
 
 export class UpdateProfileDto {

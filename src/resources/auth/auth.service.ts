@@ -71,6 +71,7 @@ export class AuthService {
         password,
         checkUser.password,
       );
+
       if (!isMatchPassword)
         throw new UnauthorizedException('Incorrect password');
 
@@ -147,6 +148,7 @@ export class AuthService {
       if (checkUser && checkUser.email === email)
         throw new ConflictException('Email already exists');
 
+      const userId = uuidv4();
       /*   eslint-disable @typescript-eslint/no-unused-vars */
       const createdUser = await this.prisma.user.create({
         data: {
@@ -159,9 +161,20 @@ export class AuthService {
           phoneNumber,
           isActive: false,
           createdAt: new Date(),
+          id: userId,
           userType: {
             connect: {
               id: AUTH_CONSTANTS.DEFAULT_USER_TYPE_ID,
+            },
+          },
+          additionalInfo: {
+            connectOrCreate: {
+              where: {
+                userId: userId,
+              },
+              create: {
+                userId: userId,
+              },
             },
           },
         },
