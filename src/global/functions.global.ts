@@ -47,7 +47,7 @@ export const processDataObject = async <T>(data: T): Promise<T> => {
     if (key === 'password' && value) {
       processedData[key] = await bcrypt.hash(value, 10);
     }
-    // Chỉ set undefined cho string rỗng hoặc null/undefined
+    // Chỉ set undefined cho null/undefined
     else if (
       typeof value !== 'boolean' &&
       typeof value !== 'number' &&
