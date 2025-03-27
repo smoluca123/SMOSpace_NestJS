@@ -4,6 +4,7 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
+  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -24,13 +25,19 @@ import {
   },
   namespace: 'comment',
 })
-export class CommentGateway implements OnGatewayConnection {
+export class CommentGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   private server: Server;
   constructor(private readonly redisService: RedisService) {}
 
   async handleConnection(client: Socket) {
-    console.log('Client connected:', client.id);
+    console.log('Client connected comment:', client.id);
+  }
+
+  async handleDisconnect(client: Socket) {
+    console.log('Client disconnected comment:', client.id);
   }
 
   @SubscribeMessage('comment:subscribeOnNewComment')

@@ -269,6 +269,9 @@ export class NotificationService {
           skip: (page - 1) * limit,
           take: limit,
           select: notificationDataSelect,
+          orderBy: {
+            createdAt: 'desc',
+          },
         }),
         this.prisma.notification.count({ where: whereQuery }),
       ]);
