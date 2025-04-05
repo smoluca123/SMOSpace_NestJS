@@ -36,6 +36,7 @@ import {
   UpdateUserDto,
   UserActiveByCodeDto,
   UserCreditsUpdateDto,
+  UserResetPasswordDto,
 } from 'src/resources/user/dto/user.dto';
 import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
 import { normalizePaginationParams } from 'src/utils/utils';
@@ -214,6 +215,15 @@ export class UserController {
     return this.userService.sendVerificationEmail(userId);
   }
 
+  @Post('/forgot-password/send-verification-email/:userEmail')
+  @ApiOperation({
+    summary: 'Send forgot password email to user',
+    description: 'Send a forgot password email to a specific user',
+  })
+  async sendForgotPasswordEmail(@Param('userEmail') userEmail: string) {
+    return this.userService.sendForgotPasswordEmail(userEmail);
+  }
+
   @Post('/active/:userId')
   @ApiOperation({
     summary: 'Activate user account by verification code',
@@ -224,6 +234,18 @@ export class UserController {
     @Body() verificationData: UserActiveByCodeDto,
   ) {
     return this.userService.userActiveByCode(userId, verificationData);
+  }
+
+  @Post('/forgot-password/:userEmail')
+  @ApiOperation({
+    summary: 'Reset password by verification code',
+    description: 'Reset a user password by verifying the provided code',
+  })
+  resetPassword(
+    @Param('userEmail') userEmail: string,
+    @Body() resetPasswordData: UserResetPasswordDto,
+  ) {
+    return this.userService.resetPassword(userEmail, resetPasswordData);
   }
 
   @Post('/follow/:userId')

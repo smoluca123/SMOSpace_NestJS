@@ -26,15 +26,17 @@ import {
   BanUserDto,
   UpdateProfileDto,
   UserActiveByCodeDto,
+  UserResetPasswordDto,
 } from 'src/resources/user/dto/user.dto';
 import { SupabaseService } from 'src/services/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
 import { addMinutes, isPast } from 'date-fns';
-import { Prisma } from '@prisma/client';
+import { Prisma, VerificationType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { S3Service } from 'src/services/aws/s3/s3.service';
 import { IMAGE_PROCESS_OPTIONS } from 'src/constants/file.constants';
 import { NotificationService } from 'src/resources/notification/notification.service';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UserService {
@@ -57,15 +59,19 @@ export class UserService {
 
   async validateUser<T = UserDataType>({
     userId,
+    userEmail,
     selectData,
   }: {
-    userId: string;
+    userId?: string;
+    userEmail?: string;
     selectData: Prisma.UserSelect;
   }): Promise<T> {
     try {
-      if (!userId) throw new BadRequestException('User ID is required');
+      if (!userId && !userEmail)
+        throw new BadRequestException('User ID or user email is required');
+
       const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: userId, email: userEmail },
         select: selectData,
       });
       if (!user) throw new NotFoundException('User not found');
@@ -614,9 +620,16 @@ export class UserService {
         throw new BadRequestException('User is already active');
 
       // Generate active code
-      const checkCode = await this.prisma.activeCode.findFirst({
+      const checkCode = await this.prisma.verificationCode.findFirst({
         where: {
-          userId: user.id,
+          AND: [
+            {
+              userId: user.id,
+            },
+            {
+              type: VerificationType.ACTIVE_ACCOUNT,
+            },
+          ],
         },
       });
 
@@ -625,12 +638,13 @@ export class UserService {
 
       // If no active code exists, create a new one
       if (!checkCode) {
-        await this.prisma.activeCode.create({
+        await this.prisma.verificationCode.create({
           data: {
             userId: user.id,
             code: activeCode,
             createdAt: currentDate,
             expiresAt: addMinutes(currentDate, EXPIRATION_MINUTES),
+            type: VerificationType.ACTIVE_ACCOUNT,
           },
         });
       } else {
@@ -639,7 +653,7 @@ export class UserService {
         if (isExpired) {
           // Generate a new active code if the existing one has expired
           activeCode = generateSecureVerificationCode();
-          await this.prisma.activeCode.update({
+          await this.prisma.verificationCode.update({
             where: { id: checkCode.id },
             data: {
               code: activeCode,
@@ -671,6 +685,114 @@ export class UserService {
     }
   }
 
+  async sendForgotPasswordEmail(userEmail: string): Promise<IResponseType> {
+    // try {
+    //   const user = await this.validateUser({
+    //     userId,
+    //     selectData: null,
+    //   });
+
+    //   if (!user) throw new NotFoundException('User not found');
+
+    //   const checkCode = await this.prisma.verificationCode.findFirst({
+    //     where: {
+    //       userId: user.id,
+    //       type: VerificationType.FORGOT_PASSWORD,
+    //     },
+    //   });
+
+    //   if (checkCode) {
+    //     await this.prisma.verificationCode.delete({
+    //       where: { id: checkCode.id },
+    //     });
+    //   }
+
+    //   return {
+    //     message: 'Forgot password email sent successfully',
+    //     data: null,
+    //     statusCode: 200,
+    //     date: new Date(),
+    //   };
+    // } catch (error) {
+    //   handleDefaultError(error);
+    // }
+    try {
+      // Define the expiration time in minutes
+      const EXPIRATION_MINUTES = 10;
+      const currentDate = new Date();
+      // Check if userId is provided
+      const user = await this.validateUser({
+        userEmail,
+        selectData: null,
+      });
+
+      // Generate active code
+      const checkCode = await this.prisma.verificationCode.findFirst({
+        where: {
+          AND: [
+            {
+              userId: user.id,
+            },
+            {
+              type: VerificationType.FORGOT_PASSWORD,
+            },
+          ],
+        },
+      });
+
+      // Determine the active code to use
+      let verificationCode =
+        checkCode?.code || generateSecureVerificationCode();
+
+      // If no active code exists, create a new one
+      if (!checkCode) {
+        await this.prisma.verificationCode.create({
+          data: {
+            userId: user.id,
+            code: verificationCode,
+            createdAt: currentDate,
+            expiresAt: addMinutes(currentDate, EXPIRATION_MINUTES),
+            type: VerificationType.FORGOT_PASSWORD,
+          },
+        });
+      } else {
+        // Check if the existing active code has expired
+        const isExpired = isPast(new Date(checkCode.expiresAt));
+        if (isExpired) {
+          // Generate a new active code if the existing one has expired
+          verificationCode = generateSecureVerificationCode();
+          await this.prisma.verificationCode.update({
+            where: { id: checkCode.id },
+            data: {
+              code: verificationCode,
+              createdAt: currentDate,
+              expiresAt: addMinutes(currentDate, EXPIRATION_MINUTES),
+            },
+          });
+        }
+      }
+
+      // Send the verification email with the active code
+      await this.emailService.sendForgotPasswordEmail({
+        email: user.email,
+        context: {
+          name: user.fullName,
+          verification_code: verificationCode,
+        },
+      });
+
+      // Return success response
+      return {
+        message: 'Forgot password email sent successfully',
+        data: null,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   /**
    * Activate a user account using verification code
    * @param userId - ID of the user to activate
@@ -693,7 +815,7 @@ export class UserService {
       if (user.isActive) throw new ForbiddenException('User is already active');
 
       // Check if verification code exists and matches
-      const checkCode = await this.prisma.activeCode.findFirst({
+      const checkCode = await this.prisma.verificationCode.findFirst({
         where: {
           userId: user.id,
           code: verificationData.verifyCode,
@@ -707,7 +829,7 @@ export class UserService {
       if (isExpired) throw new ForbiddenException('Verification code expired');
 
       // Delete used verification code
-      await this.prisma.activeCode.delete({
+      await this.prisma.verificationCode.delete({
         where: { id: checkCode.id },
       });
 
@@ -721,6 +843,52 @@ export class UserService {
       // Return success response
       return {
         message: 'User activated successfully',
+        data: updatedUser,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async resetPassword(
+    userEmail: string,
+    { password, verifyCode }: UserResetPasswordDto,
+  ): Promise<IResponseType<UserDataType>> {
+    try {
+      const user = await this.validateUser({
+        userEmail,
+        selectData: null,
+      });
+
+      const checkCode = await this.prisma.verificationCode.findFirst({
+        where: {
+          userId: user.id,
+          code: verifyCode,
+          type: VerificationType.FORGOT_PASSWORD,
+        },
+      });
+
+      if (!checkCode) throw new ForbiddenException('Invalid verification code');
+
+      const isExpired = isPast(new Date(checkCode.expiresAt));
+      if (isExpired) throw new ForbiddenException('Verification code expired');
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const updatedUser = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+        select: userDataSelect,
+      });
+
+      await this.prisma.verificationCode.delete({
+        where: { id: checkCode.id },
+      });
+
+      return {
+        message: 'Password reset successfully',
         data: updatedUser,
         statusCode: 200,
         date: new Date(),

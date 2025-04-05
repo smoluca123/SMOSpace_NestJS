@@ -79,4 +79,26 @@ export class EmailService {
       },
     });
   }
+
+  async sendForgotPasswordEmail({
+    email,
+    context,
+  }: {
+    email: string;
+    context: {
+      name: string;
+      verification_code: string;
+      confirmationLink?: string;
+    };
+  }) {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: `SMO - Forgot Password`,
+      template: './forgotpassword/html',
+      context: {
+        ...context,
+        // confirmationLink: context.confirmationLink || '#',
+      },
+    });
+  }
 }
