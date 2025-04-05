@@ -72,14 +72,14 @@ model User {
   followerCount  Int       @default(0) @map("follower_count")
   followingCount Int       @default(0) @map("following_count")
 
-  userType    UserType      @relation(fields: [type], references: [id], onDelete: Restrict)
-  UserSession UserSession[]
-  ActiveCode  ActiveCode[]
-  post        Post[]
-  postLike    PostLike[]
-  following   Follow[]      @relation("Following")
-  followers   Follow[]      @relation("Followers")
-  comments    PostComment[]
+  userType         UserType           @relation(fields: [type], references: [id], onDelete: Restrict)
+  UserSession      UserSession[]
+  verificationCode VerificationCode[]
+  post             Post[]
+  postLike         PostLike[]
+  following        Follow[]           @relation("Following")
+  followers        Follow[]           @relation("Followers")
+  comments         PostComment[]
 
   // Notification relationships
   notificationsSent     Notification[] @relation("NotificationSender")
@@ -155,16 +155,22 @@ model UserSession {
   @@map("user_sessions")
 }
 
-model ActiveCode {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  code      String   @unique
-  isActive  Boolean  @default(false)
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+model VerificationCode {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  code      String           @unique
+  isActive  Boolean          @default(false)
+  expiresAt DateTime         @map("expires_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type      VerificationType @map("type")
 
-  @@map("active_codes")
+  @@map("verification_codes")
+}
+
+enum VerificationType {
+  ACTIVE_ACCOUNT
+  FORGOT_PASSWORD
 }
 
 model Post {

@@ -44,6 +44,60 @@ export class NotificationService {
     }
   }
 
+  async deleteNotification(id: string) {
+    try {
+      return await this.prisma.notification.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+        },
+      });
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deleteNotifications(ids: string[]) {
+    try {
+      return await this.prisma.notification.updateMany({
+        where: { id: { in: ids } },
+        data: {
+          isDeleted: true,
+        },
+      });
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deleteCommentNotification({
+    recipientId,
+    senderId,
+  }: {
+    recipientId: string;
+    senderId: string;
+  }) {
+    try {
+      const notification = await this.prisma.notification.findFirst({
+        where: {
+          type: {
+            type: {
+              in: ['COMMENT_POST', 'REPLY_COMMENT', 'COMMENT_MENTION'],
+            },
+          },
+          entityType: EntityType.COMMENT,
+          isDeleted: false,
+          recipientId,
+          senderId,
+        },
+      });
+      if (!notification) return;
+      return await this.deleteNotification(notification.id);
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   async createFollowNotification(payload: INotificationFollowPayload) {
     // const follower = await this.prisma.follow.findUnique({
     //   where: {

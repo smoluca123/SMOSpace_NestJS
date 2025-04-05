@@ -123,6 +123,17 @@ export class UserActiveByCodeDto {
   verifyCode: string;
 }
 
+export class UserResetPasswordDto {
+  @ApiProperty({ default: '' })
+  @IsString()
+  @IsNotEmpty()
+  verifyCode: string;
+  @ApiProperty({ default: '' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+
 export class RefreshTokenDto {
   @ApiProperty({ default: '' })
   @IsString()

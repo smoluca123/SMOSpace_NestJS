@@ -495,6 +495,7 @@ export class PostCommentService {
           post: {
             select: {
               commentCount: true,
+              authorId: true,
             },
           },
         },
@@ -534,6 +535,13 @@ export class PostCommentService {
             ]
           : []),
       ]);
+
+      if (commentExist.post.authorId !== commentExist.authorId) {
+        await this.notification.deleteCommentNotification({
+          recipientId: commentExist.post.authorId,
+          senderId: commentExist.authorId,
+        });
+      }
 
       return { deletedComment };
     } catch (error) {
