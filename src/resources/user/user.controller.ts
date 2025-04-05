@@ -215,13 +215,13 @@ export class UserController {
     return this.userService.sendVerificationEmail(userId);
   }
 
-  @Post('/forgot-password/send-verification-email/:userId')
+  @Post('/forgot-password/send-verification-email/:userEmail')
   @ApiOperation({
     summary: 'Send forgot password email to user',
     description: 'Send a forgot password email to a specific user',
   })
-  async sendForgotPasswordEmail(@Param('userId') userId: string) {
-    return this.userService.sendForgotPasswordEmail(userId);
+  async sendForgotPasswordEmail(@Param('userEmail') userEmail: string) {
+    return this.userService.sendForgotPasswordEmail(userEmail);
   }
 
   @Post('/active/:userId')
@@ -236,16 +236,16 @@ export class UserController {
     return this.userService.userActiveByCode(userId, verificationData);
   }
 
-  @Post('/forgot-password/:userId')
+  @Post('/forgot-password/:userEmail')
   @ApiOperation({
     summary: 'Reset password by verification code',
     description: 'Reset a user password by verifying the provided code',
   })
   resetPassword(
-    @Param('userId') userId: string,
+    @Param('userEmail') userEmail: string,
     @Body() resetPasswordData: UserResetPasswordDto,
   ) {
-    return this.userService.resetPassword(userId, resetPasswordData);
+    return this.userService.resetPassword(userEmail, resetPasswordData);
   }
 
   @Post('/follow/:userId')

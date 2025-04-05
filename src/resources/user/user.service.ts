@@ -59,15 +59,19 @@ export class UserService {
 
   async validateUser<T = UserDataType>({
     userId,
+    userEmail,
     selectData,
   }: {
-    userId: string;
+    userId?: string;
+    userEmail?: string;
     selectData: Prisma.UserSelect;
   }): Promise<T> {
     try {
-      if (!userId) throw new BadRequestException('User ID is required');
+      if (!userId && !userEmail)
+        throw new BadRequestException('User ID or user email is required');
+
       const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: userId, email: userEmail },
         select: selectData,
       });
       if (!user) throw new NotFoundException('User not found');
@@ -681,7 +685,7 @@ export class UserService {
     }
   }
 
-  async sendForgotPasswordEmail(userId: string): Promise<IResponseType> {
+  async sendForgotPasswordEmail(userEmail: string): Promise<IResponseType> {
     // try {
     //   const user = await this.validateUser({
     //     userId,
@@ -718,7 +722,7 @@ export class UserService {
       const currentDate = new Date();
       // Check if userId is provided
       const user = await this.validateUser({
-        userId,
+        userEmail,
         selectData: null,
       });
 
@@ -849,12 +853,12 @@ export class UserService {
   }
 
   async resetPassword(
-    userId: string,
+    userEmail: string,
     { password, verifyCode }: UserResetPasswordDto,
   ): Promise<IResponseType<UserDataType>> {
     try {
       const user = await this.validateUser({
-        userId,
+        userEmail,
         selectData: null,
       });
 
