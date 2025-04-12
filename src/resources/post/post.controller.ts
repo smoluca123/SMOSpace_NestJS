@@ -93,7 +93,6 @@ export class PostController {
       limit,
       page,
       likeUserId: userId,
-      getPrivatePost: true,
       followUserId: userId,
     });
   }
