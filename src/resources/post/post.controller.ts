@@ -73,6 +73,31 @@ export class PostController {
     });
   }
 
+  @Get('/following-posts')
+  @getMyPostsDecorator()
+  getFollowingPosts(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+    @Query('keywords') keywords?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+
+    const { userId } = decodedAccessToken;
+
+    return this.postService.getPosts({
+      keywords,
+      limit,
+      page,
+      likeUserId: userId,
+      getPrivatePost: true,
+      followUserId: userId,
+    });
+  }
+
   @Get('trending')
   @getTrendingTopicsDecorator()
   getTrendingTopics() {

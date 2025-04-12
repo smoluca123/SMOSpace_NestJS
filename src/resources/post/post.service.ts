@@ -66,6 +66,7 @@ export class PostService {
     userId,
     likeUserId,
     getPrivatePost = false,
+    followUserId,
   }: {
     keywords?: string;
     limit: number;
@@ -73,11 +74,23 @@ export class PostService {
     userId?: string;
     likeUserId?: string;
     getPrivatePost?: boolean;
+    followUserId?: string;
   }): Promise<IPaginationResponseType<PostDataType>> {
     try {
       const whereQuery: Prisma.PostWhereInput = {
         authorId: userId || undefined,
         ...(!getPrivatePost ? { isPrivate: false } : {}),
+        ...(followUserId
+          ? {
+              author: {
+                followers: {
+                  some: {
+                    followerId: followUserId,
+                  },
+                },
+              },
+            }
+          : {}),
         OR: [
           {
             content: {
@@ -138,13 +151,13 @@ export class PostService {
       return {
         message: 'Posts fetched successfully',
         data: {
-          items: postsWithLikeStatus,
           totalCount,
           totalPage,
           currentPage: page,
           pageSize: limit,
           hasNextPage,
           hasPreviousPage,
+          items: postsWithLikeStatus,
         },
         statusCode: 200,
         date: new Date(),
