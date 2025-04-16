@@ -467,6 +467,8 @@ export class PostService {
     >
   > {
     try {
+      const price = 1;
+
       const user = await this.prisma.user.findUnique({
         where: {
           id: decodedAccessToken.userId,
@@ -476,9 +478,11 @@ export class PostService {
         },
       });
 
-      if (user.credits.lte(0)) {
+      if (user.credits.lte(price)) {
         throw new BadRequestException({
           message: 'Not enough credits',
+          price,
+          currentCredits: user.credits,
           date: new Date(),
         });
       }
@@ -489,7 +493,7 @@ export class PostService {
         },
         data: {
           credits: {
-            decrement: 1,
+            decrement: price,
           },
         },
         select: {
@@ -511,8 +515,8 @@ export class PostService {
       if (resultContent === blockResultMessage)
         throw new BadRequestException({
           message: blockResultMessage,
-          price: '1 credits',
-          priceNum: 1,
+          price: `${price} credits`,
+          priceNum: price,
           currentCredits: updateUser.credits,
           statusCode: 400,
           date: new Date(),
@@ -521,8 +525,8 @@ export class PostService {
       return {
         message: 'AI generated a post successfully',
         data: {
-          price: '1 credits',
-          priceNum: 1,
+          price: `${price} credits`,
+          priceNum: price,
           currentCredits: updateUser.credits,
           content: resultContent,
         },
