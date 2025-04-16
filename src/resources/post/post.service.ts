@@ -487,20 +487,6 @@ export class PostService {
         });
       }
 
-      const updateUser = await this.prisma.user.update({
-        where: {
-          id: decodedAccessToken.userId,
-        },
-        data: {
-          credits: {
-            decrement: price,
-          },
-        },
-        select: {
-          credits: true,
-        },
-      });
-
       const completion = await openai.chat.completions.create({
         model: 'openai/gpt-4o-mini',
         messages: [
@@ -517,10 +503,24 @@ export class PostService {
           message: blockResultMessage,
           price: `${price} credits`,
           priceNum: price,
-          currentCredits: updateUser.credits,
+          currentCredits: user.credits,
           statusCode: 400,
           date: new Date(),
         });
+
+      const updateUser = await this.prisma.user.update({
+        where: {
+          id: decodedAccessToken.userId,
+        },
+        data: {
+          credits: {
+            decrement: price,
+          },
+        },
+        select: {
+          credits: true,
+        },
+      });
 
       return {
         message: 'AI generated a post successfully',
