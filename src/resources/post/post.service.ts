@@ -481,7 +481,7 @@ export class PostService {
       if (user.credits.lte(price)) {
         throw new BadRequestException({
           message: 'Not enough credits',
-          price,
+          price: 0,
           currentCredits: user.credits,
           date: new Date(),
         });
