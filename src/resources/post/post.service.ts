@@ -467,6 +467,8 @@ export class PostService {
     >
   > {
     try {
+      const price = 1;
+
       const user = await this.prisma.user.findUnique({
         where: {
           id: decodedAccessToken.userId,
@@ -476,26 +478,14 @@ export class PostService {
         },
       });
 
-      if (user.credits.lte(0)) {
+      if (user.credits.lte(price)) {
         throw new BadRequestException({
           message: 'Not enough credits',
+          price,
+          currentCredits: user.credits,
           date: new Date(),
         });
       }
-
-      const updateUser = await this.prisma.user.update({
-        where: {
-          id: decodedAccessToken.userId,
-        },
-        data: {
-          credits: {
-            decrement: 1,
-          },
-        },
-        select: {
-          credits: true,
-        },
-      });
 
       const completion = await openai.chat.completions.create({
         model: 'openai/gpt-4o-mini',
@@ -511,18 +501,32 @@ export class PostService {
       if (resultContent === blockResultMessage)
         throw new BadRequestException({
           message: blockResultMessage,
-          price: '1 credits',
-          priceNum: 1,
-          currentCredits: updateUser.credits,
+          price: `0 credits`,
+          priceNum: 0,
+          currentCredits: user.credits,
           statusCode: 400,
           date: new Date(),
         });
 
+      const updateUser = await this.prisma.user.update({
+        where: {
+          id: decodedAccessToken.userId,
+        },
+        data: {
+          credits: {
+            decrement: price,
+          },
+        },
+        select: {
+          credits: true,
+        },
+      });
+
       return {
         message: 'AI generated a post successfully',
         data: {
-          price: '1 credits',
-          priceNum: 1,
+          price: `${price} credits`,
+          priceNum: price,
           currentCredits: updateUser.credits,
           content: resultContent,
         },
