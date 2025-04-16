@@ -501,8 +501,8 @@ export class PostService {
       if (resultContent === blockResultMessage)
         throw new BadRequestException({
           message: blockResultMessage,
-          price: `${price} credits`,
-          priceNum: price,
+          price: `0 credits`,
+          priceNum: 0,
           currentCredits: user.credits,
           statusCode: 400,
           date: new Date(),
