@@ -60,6 +60,11 @@ export const getPostDecorator = () =>
     ApiParam({
       name: 'postId',
     }),
+    ApiQuery({
+      name: 'likeUserId',
+      required: false,
+      description: 'User ID to check like status of posts for this user',
+    }),
     ApiOperation({
       summary: 'Get post details',
       description:

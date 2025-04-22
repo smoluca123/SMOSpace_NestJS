@@ -169,8 +169,10 @@ export class PostService {
 
   async getPostById({
     postId,
+    likeUserId,
   }: {
     postId: string;
+    likeUserId?: string;
   }): Promise<IResponseType<PostDataType>> {
     try {
       if (!postId) {
@@ -183,7 +185,17 @@ export class PostService {
 
       const post = await this.prisma.post.findUnique({
         where: { id: postId },
-        select: postDataSelect,
+        select: {
+          ...postDataSelect,
+          likes: {
+            where: {
+              userId: likeUserId || '',
+            },
+            select: {
+              userId: true,
+            },
+          },
+        },
       });
 
       if (!post) {
@@ -193,9 +205,16 @@ export class PostService {
           date: new Date(),
         });
       }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { likes, ...postWithLikeStatus } = {
+        ...post,
+        isLiked: post.likes.length > 0,
+      };
+
       return {
         message: 'Post fetched successfully',
-        data: post,
+        data: postWithLikeStatus,
         statusCode: 200,
         date: new Date(),
       };

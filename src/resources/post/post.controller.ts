@@ -120,8 +120,11 @@ export class PostController {
 
   @Get(':postId')
   @getPostDecorator()
-  getPostById(@Param('postId') postId: string) {
-    return this.postService.getPostById({ postId });
+  getPostById(
+    @Param('postId') postId: string,
+    @Query('likeUserId') likeUserId?: string,
+  ) {
+    return this.postService.getPostById({ postId, likeUserId });
   }
 
   @Get('/')
