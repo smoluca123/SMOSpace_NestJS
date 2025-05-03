@@ -88,6 +88,7 @@ model User {
   // Additional info
   userAdditionalInfoId String?             @unique
   additionalInfo       UserAdditionalInfo? @relation(fields: [userAdditionalInfoId], references: [id])
+  Media                Media[]
 
   @@index([username, email, type])
   @@map("users")
@@ -186,6 +187,7 @@ model Post {
   author   User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
   likes    PostLike[]
   comments PostComment[]
+  media    Media[]
 
   @@index([authorId, createdAt])
   @@map("posts")
@@ -351,4 +353,35 @@ model NotificationType {
   Notification Notification[]
 
   @@map("notification_types")
+}
+
+model Media {
+  id        String    @id @default(uuid())
+  url       String
+  type      MediaType
+  size      Int // Size in bytes
+  width     Int?
+  height    Int?
+  duration  Int? // Duration in seconds (for videos)
+  format    String // File format (e.g. jpg, png, mp4)
+  isDeleted Boolean   @default(false) @map("is_deleted")
+
+  // Relations
+  postId String? @map("post_id")
+  post   Post?   @relation(fields: [postId], references: [id])
+  userId String  @map("user_id")
+  user   User    @relation(fields: [userId], references: [id])
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([postId])
+  @@index([userId])
+  @@map("media")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
 }

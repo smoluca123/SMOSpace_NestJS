@@ -21,7 +21,12 @@ async function bootstrap() {
   SwaggerModule.setup('/swagger', app, document);
 
   // Use Global Pipes to validate incoming requests
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      // transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
   // Enable Cors (Cross-Origin Resource Sharing) middleware
   app.enableCors({

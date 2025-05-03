@@ -442,11 +442,13 @@ export class UserService {
       // const { url } = await this.supabase.uploadFile(file);
 
       //Upload the file to the storage service and get the URL of the uploaded file.
-      const { url } = await this.s3Service.uploadFile(
+
+      const { url } = await this.s3Service.uploadImage({
         file,
-        file.originalname,
-        {},
-      );
+        name: file.originalname,
+        imageOptions: {},
+        userId,
+      });
 
       // Update the user's avatar with the URL of the uploaded file.
       const updatedUser = await this.prisma.user.update({
@@ -484,11 +486,12 @@ export class UserService {
       // const { url } = await this.supabase.uploadFile(file);
 
       //Upload the file to the storage service and get the URL of the uploaded file.
-      const { url } = await this.s3Service.uploadFile(
+      const { url } = await this.s3Service.uploadImage({
         file,
-        file.originalname,
-        IMAGE_PROCESS_OPTIONS,
-      );
+        name: file.originalname,
+        imageOptions: IMAGE_PROCESS_OPTIONS,
+        userId: user.id,
+      });
 
       const updatedUser = await this.prisma.user.update({
         where: { id: user.id },

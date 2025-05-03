@@ -67,6 +67,22 @@ export type UserSessionDataType = Prisma.UserSessionGetPayload<{
   select: typeof userSessionDataSelect;
 }>;
 
+export const mediaDataSelect = {
+  id: true,
+  url: true,
+  type: true,
+  size: true,
+  format: true,
+  // user: {
+  //   select: userDataSelect,
+  // },
+  createdAt: true,
+  updatedAt: true,
+  height: true,
+  width: true,
+  duration: true,
+} satisfies Prisma.MediaSelect;
+
 export const postDataSelect = {
   id: true,
   content: true,
@@ -75,6 +91,9 @@ export const postDataSelect = {
   updatedAt: true,
   likeCount: true,
   commentCount: true,
+  media: {
+    select: mediaDataSelect,
+  },
   author: {
     select: userDataSelect,
   },
@@ -104,6 +123,14 @@ export type PostDataType = Prisma.PostGetPayload<{
   // include: typeof postDataInclude;
 }>;
 
+export type PostDataTypeWithLikes = PostDataType & {
+  likes: PostLikeDataType[];
+};
+
+export type PostDataTypeWithLikeStatus = PostDataType & {
+  isLiked: boolean;
+};
+
 export type PostLikeDataType = Prisma.PostLikeGetPayload<{
   select: typeof postLikeDataSelect;
 }>;
@@ -111,6 +138,27 @@ export type PostLikeDataType = Prisma.PostLikeGetPayload<{
 export type TrendingTopicType = {
   hashtag: string;
   count: number;
+};
+
+export const mediaDataInclude = {
+  user: {
+    select: userDataSelect,
+  },
+  post: {
+    select: postDataSelect,
+  },
+} satisfies Prisma.MediaInclude;
+
+export type MediaDataType = Prisma.MediaGetPayload<{
+  select: typeof mediaDataSelect;
+}>;
+
+export type MediaDataTypeWithUser = MediaDataType & {
+  user: UserDataType;
+};
+
+export type MediaDataTypeWithPost = MediaDataType & {
+  post: PostDataType;
 };
 
 export const followDataSelect = {

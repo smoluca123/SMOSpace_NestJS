@@ -20,6 +20,8 @@ import {
 import {
   postDataSelect,
   PostDataType,
+  PostDataTypeWithLikes,
+  PostDataTypeWithLikeStatus,
   PostLikeDataType,
   TrendingTopicType,
   userDataSelect,
@@ -32,14 +34,19 @@ import {
   UpdatePostAsAdminDto,
   UpdatePostDto,
 } from 'src/resources/post/dto/post.dto';
+import { S3Service } from 'src/services/aws/s3/s3.service';
 
 @Injectable()
 export class PostService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly postGateway: PostGateway,
+    private readonly s3Service: S3Service,
   ) {}
-  async validatePost(postId: string) {
+  async validatePost<DataType = PostDataType>(
+    postId: string,
+    select?: Prisma.PostSelect,
+  ): Promise<DataType> {
     try {
       if (!postId) {
         throw new BadRequestException('Post id is required');
@@ -47,13 +54,13 @@ export class PostService {
 
       const post = await this.prisma.post.findUnique({
         where: { id: postId },
-        select: postDataSelect,
+        select: select || postDataSelect,
       });
 
       if (!post) {
         throw new NotFoundException('Post not found');
       }
-      return post;
+      return post as DataType;
     } catch (error) {
       handleDefaultError(error);
     }
@@ -173,30 +180,41 @@ export class PostService {
   }: {
     postId: string;
     likeUserId?: string;
-  }): Promise<IResponseType<PostDataType>> {
+  }): Promise<IResponseType<PostDataTypeWithLikeStatus>> {
     try {
-      if (!postId) {
-        throw new BadRequestException({
-          message: 'Post id is required',
-          statusCode: 400,
-          date: new Date(),
-        });
-      }
-
-      const post = await this.prisma.post.findUnique({
-        where: { id: postId },
-        select: {
-          ...postDataSelect,
-          likes: {
-            where: {
-              userId: likeUserId || '',
-            },
-            select: {
-              userId: true,
-            },
+      const post = await this.validatePost<PostDataTypeWithLikes>(postId, {
+        ...postDataSelect,
+        likes: {
+          where: {
+            userId: likeUserId || '',
+          },
+          select: {
+            userId: true,
           },
         },
       });
+      // if (!postId) {
+      //   throw new BadRequestException({
+      //     message: 'Post id is required',
+      //     statusCode: 400,
+      //     date: new Date(),
+      //   });
+      // }
+
+      // const post = await this.prisma.post.findUnique({
+      //   where: { id: postId },
+      //   select: {
+      //     ...postDataSelect,
+      //     likes: {
+      //       where: {
+      //         userId: likeUserId || '',
+      //       },
+      //       select: {
+      //         userId: true,
+      //       },
+      //     },
+      //   },
+      // });
 
       if (!post) {
         throw new NotFoundException({
@@ -353,6 +371,8 @@ export class PostService {
     data: CreatePostDto,
   ): Promise<IResponseType<PostDataType>> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { images: imagesData, ...postData } = data;
       const { userId } = decodedAccessToken;
       const [, post] = await this.prisma.$transaction([
         this.prisma.user.update({
@@ -368,12 +388,21 @@ export class PostService {
         }),
         this.prisma.post.create({
           data: {
-            ...data,
+            ...postData,
             authorId: userId,
           },
           select: postDataSelect,
         }),
       ]);
+      let images = [];
+      if (data.images) {
+        images = await this.s3Service.uploadPostImages({
+          files: data.images,
+          names: data.images.map((image) => image.originalname),
+          userId,
+          postId: post.id,
+        });
+      }
 
       // Emit new post to all connected clients
       if (!post.isPrivate) {
@@ -382,7 +411,7 @@ export class PostService {
 
       return {
         message: 'Post created successfully',
-        data: post,
+        data: { ...post, media: images },
         statusCode: 201,
         date: new Date(),
       };
@@ -679,6 +708,9 @@ export class PostService {
     if (!post) {
       throw new NotFoundException('Post not found');
     }
+
+    // Delete post images
+    this.s3Service.deletePostImages({ postId });
 
     if (userId) {
       // If userId provided, verify user exists and has permission

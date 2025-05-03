@@ -1,6 +1,8 @@
-import { applyDecorators, UseGuards } from '@nestjs/common';
+import { applyDecorators, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
+  ApiConsumes,
   ApiHeader,
   ApiOperation,
   ApiParam,
@@ -137,6 +139,7 @@ export const getLikesPostDecorator = () =>
 export const createPostDecorator = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),
+    ApiConsumes('multipart/form-data'),
     ApiOperation({
       summary: 'Create post',
       description:
@@ -146,6 +149,23 @@ export const createPostDecorator = () =>
       name: 'accessToken',
       required: true,
     }),
+    UseInterceptors(
+      FilesInterceptor('images', 50, {
+        limits: {
+          fileSize: 1024 * 1024 * 50, //50MB
+        },
+        fileFilter(req, file, cb) {
+          // /^.*\.(jpg|jpeg|png|gif|bmp|webp)$/i
+          if (!file.mimetype.match('image/*')) {
+            console.log('Cancel upload, file not support');
+            // Block image upload in public/img folder
+            cb(null, false);
+          } else {
+            cb(null, true);
+          }
+        },
+      }),
+    ),
   );
 
 export const updatePostDecorator = () =>

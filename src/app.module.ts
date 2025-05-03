@@ -18,6 +18,8 @@ import cacheConfig from 'src/configs/cache.config';
 import { PostCommentModule } from 'src/resources/post-comment/post-comment.module';
 import { RedisModule } from '@liaoliaots/nestjs-redis';
 import { NotificationModule } from 'src/resources/notification/notification.module';
+import { S3Module } from 'src/services/aws/s3/s3.module';
+import { S3Service } from 'src/services/aws/s3/s3.service';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -112,11 +114,13 @@ import { NotificationModule } from 'src/resources/notification/notification.modu
     PostModule,
     // AppGatewayModule,
     NotificationModule,
+    S3Module,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     JwtStrategy,
+    S3Service,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
