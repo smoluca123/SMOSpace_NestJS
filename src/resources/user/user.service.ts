@@ -17,6 +17,9 @@ import {
 import {
   followDataSelect,
   FollowDataType,
+  friendDataSelect,
+  friendDataSelectWithInclude,
+  FriendDataType,
   userDataSelect,
   UserDataType,
   UserDataWithIsFollowedType,
@@ -31,7 +34,7 @@ import {
 import { SupabaseService } from 'src/services/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
 import { addMinutes, isPast } from 'date-fns';
-import { Prisma, VerificationType } from '@prisma/client';
+import { FriendStatus, Prisma, VerificationType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { S3Service } from 'src/services/aws/s3/s3.service';
 import { IMAGE_PROCESS_OPTIONS } from 'src/constants/file.constants';
@@ -85,14 +88,19 @@ export class UserService {
     keywords = '',
     limit = 10,
     page = 1,
-    followerId,
+    currentUserId,
   }: {
     keywords?: string;
     limit?: number;
     page?: number;
-    followerId?: string;
+    currentUserId?: string;
   }): Promise<
-    IPaginationResponseType<UserDataType | UserDataWithIsFollowedType>
+    IPaginationResponseType<
+      | UserDataType
+      | (UserDataWithIsFollowedType & {
+          friend: FriendDataType;
+        })
+    >
   > {
     try {
       // Build where query to search across multiple user fields
@@ -120,8 +128,17 @@ export class UserService {
           select: {
             ...userDataSelect,
             followers: {
-              where: { followerId: followerId || '' },
+              where: { followerId: currentUserId || '' },
               select: { followerId: true },
+            },
+            friends: {
+              where: {
+                OR: [
+                  { userId: currentUserId || '' },
+                  { friendId: currentUserId || '' },
+                ],
+              },
+              select: friendDataSelect,
             },
           },
         }),
@@ -132,9 +149,10 @@ export class UserService {
       const hasNextPage = page < totalPage;
       const hasPreviousPage = !!totalCount && page > 1;
 
-      const result = users.map(({ followers, ...user }) => ({
+      const result = users.map(({ followers, friends, ...user }) => ({
         ...user,
         isFollowedByUser: followers?.length > 0 || false,
+        friend: friends.length > 0 ? friends[0] : null,
       }));
 
       // Return formatted response
@@ -201,10 +219,10 @@ export class UserService {
    */
   async getUserInformation({
     userId,
-    followerId,
+    currentUserId,
   }: {
     userId: string;
-    followerId: string;
+    currentUserId: string;
   }): Promise<IResponseType<UserDataType | UserDataWithIsFollowedType>> {
     try {
       // Validate that userId is provided
@@ -219,12 +237,18 @@ export class UserService {
           // Include standard user fields
           ...userDataSelect,
           // Conditionally include followers data if followerId is provided
-          followers: followerId
+          followers: currentUserId
             ? {
-                where: { followerId },
+                where: { followerId: currentUserId },
                 select: { followerId: true },
               }
             : false,
+          friends: {
+            where: {
+              OR: [{ userId: currentUserId }, { friendId: currentUserId }],
+            },
+            select: friendDataSelect,
+          },
         },
       });
 
@@ -232,7 +256,7 @@ export class UserService {
       if (!user) throw new NotFoundException('User not found');
 
       // Extract followers data and prepare result
-      const { followers, ...userResult } = user;
+      const { followers, friends, ...userResult } = user;
       // const result =
       //   followerId && followers?.length > 0
       //     ? { ...userResult, isFollowedByUser: true }
@@ -241,6 +265,7 @@ export class UserService {
       const result = {
         ...userResult,
         isFollowedByUser: followers?.length > 0 || false,
+        friend: friends?.length > 0 ? friends[0] : null,
       };
 
       // Return success response
@@ -940,6 +965,9 @@ export class UserService {
           followerId: followerUserId,
           followingId: userId,
         },
+        select: {
+          id: true,
+        },
       });
 
       // Execute multiple database operations in a transaction
@@ -1015,7 +1043,9 @@ export class UserService {
   }): Promise<
     IPaginationResponseType<
       Omit<FollowDataType, 'following'> & {
-        follower: UserDataWithIsFollowedType;
+        follower: UserDataWithIsFollowedType & {
+          friend: FriendDataType;
+        };
       }
     >
   > {
@@ -1055,6 +1085,12 @@ export class UserService {
                     id: true,
                   },
                 },
+                friends: {
+                  where: {
+                    OR: [{ userId: userId }, { friendId: userId }],
+                  },
+                  select: friendDataSelect,
+                },
               },
             },
           },
@@ -1068,13 +1104,14 @@ export class UserService {
 
       // Transform followers data to include isFollowedByUser flag
       const items = followers.map((followerItem) => {
-        const { followers, ...follower } = followerItem.follower;
+        const { followers, friends, ...follower } = followerItem.follower;
 
         return {
           ...followerItem,
           follower: {
             ...follower,
             isFollowedByUser: followers.length > 0,
+            friend: friends.length > 0 ? friends[0] : null,
           },
         };
       });
@@ -1120,7 +1157,9 @@ export class UserService {
   }): Promise<
     IPaginationResponseType<
       Omit<FollowDataType, 'following'> & {
-        follower: UserDataWithIsFollowedType;
+        follower: UserDataWithIsFollowedType & {
+          friend: FriendDataType;
+        };
       }
     >
   > {
@@ -1164,6 +1203,15 @@ export class UserService {
                     id: true,
                   },
                 },
+                friends: {
+                  where: {
+                    OR: [
+                      { userId: followerId || '' },
+                      { friendId: followerId || '' },
+                    ],
+                  },
+                  select: friendDataSelect,
+                },
               },
             },
           },
@@ -1177,12 +1225,13 @@ export class UserService {
 
       // Transform followers data to include isFollowedByUser flag
       const items = followers.map((followerItem) => {
-        const { followers, ...follower } = followerItem.follower;
+        const { followers, friends, ...follower } = followerItem.follower;
         return {
           ...followerItem,
           follower: {
             ...follower,
             isFollowedByUser: followers.length > 0,
+            friend: friends.length > 0 ? friends[0] : null,
           },
         };
       });
@@ -1207,40 +1256,6 @@ export class UserService {
       handleDefaultError(error);
     }
   }
-
-  // async getFollowings({
-  //   userId,
-  //   limit = 10,
-  //   page = 1,
-  // }: {
-  //   userId: string;
-  //   limit?: number;
-  //   page?: number;
-  // }): Promise<IPaginationResponseType<UserDataWithIsFollowedType[]>> {
-  //   try {
-  //     const user = await this.validateUser({
-  //       userId,
-  //       selectData: null,
-  //     });
-
-  //     const whereQuery: Prisma.FollowWhereInput = {
-  //       followerId: user.id,
-  //     };
-
-  //     const followings = await this.prisma.follow.findMany({
-  //       where: whereQuery,
-  //       select: followDataSelect,
-  //     });
-  //     return {
-  //       message: 'Get followings successfully',
-  //       data: followings,
-  //       statusCode: 200,
-  //       date: new Date(),
-  //     };
-  //   } catch (error) {
-  //     handleDefaultError(error);
-  //   }
-  // }
 
   async getFollowings({
     userId,
@@ -1293,6 +1308,12 @@ export class UserService {
                     id: true,
                   },
                 },
+                friends: {
+                  where: {
+                    OR: [{ userId: userId }, { friendId: userId }],
+                  },
+                  select: friendDataSelect,
+                },
               },
             },
           },
@@ -1338,60 +1359,59 @@ export class UserService {
     }
   }
 
-  // async getFollowingsById({
+  // async handleGetFriends({
   //   userId,
   //   limit = 10,
   //   page = 1,
+  //   status = FriendStatus.ACCEPTED,
+  //   whereQuery,
+  //   selectData,
   // }: {
   //   userId: string;
   //   limit?: number;
   //   page?: number;
+  //   status?: FriendStatus;
+  //   whereQuery?: Prisma.FriendWhereInput;
+  //   selectData?: Prisma.FriendSelect;
   // }): Promise<
-  //   IPaginationResponseType<
-  //     Omit<FollowDataType, 'follower'> & {
-  //       following: UserDataWithIsFollowedType;
-  //     }
-  //   >
+  //   IPaginationResponseType<FriendDataType> & {
+  //     data: {
+  //       user: UserDataType;
+  //     };
+  //   }
   // > {
   //   try {
-  //     // Validate user ID is provided
-  //     if (!userId) throw new BadRequestException('User ID is required');
+  //     const user = await this.validateUser({
+  //       userId,
+  //       selectData: userDataSelect,
+  //     });
 
-  //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  //     const { follower, ...filledFollowData } = followDataSelect;
-
-  //     // Build where query to get followers of specified user
-  //     const whereQuery: Prisma.FollowWhereInput = {
-  //       followerId: userId,
+  //     const whereQueryDefault: Prisma.FriendWhereInput = {
+  //       OR: [
+  //         {
+  //           userId: userId,
+  //         },
+  //         {
+  //           friendId: userId,
+  //         },
+  //       ],
+  //       status,
   //     };
 
-  //     // Execute transaction to get total count and followers data
-  //     const [totalCount, followings] = await this.prisma.$transaction([
-  //       // Get total number of followers
-  //       this.prisma.follow.count({ where: whereQuery }),
-  //       // Get paginated followers with their follow status
-  //       this.prisma.follow.findMany({
-  //         where: whereQuery,
+  //     const selectDataDefault: Prisma.FriendSelect = {
+  //       ...friendDataSelect,
+  //       friend: {
+  //         select: userDataSelect,
+  //       },
+  //     };
+
+  //     const [totalCount, friends] = await this.prisma.$transaction([
+  //       this.prisma.friend.count({ where: whereQuery || whereQueryDefault }),
+  //       this.prisma.friend.findMany({
+  //         where: whereQuery || whereQueryDefault,
   //         skip: (page - 1) * limit,
   //         take: limit,
-  //         orderBy: { createdAt: 'desc' },
-  //         select: {
-  //           ...filledFollowData,
-  //           following: {
-  //             select: {
-  //               ...userDataSelect,
-  //               // Check if the user follows back
-  //               following: {
-  //                 where: {
-  //                   followerId: userId,
-  //                 },
-  //                 select: {
-  //                   id: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
+  //         select: selectData || selectDataDefault,
   //       }),
   //     ]);
 
@@ -1400,23 +1420,8 @@ export class UserService {
   //     const hasNextPage = page < totalPage;
   //     const hasPreviousPage = !!totalCount && page > 1;
 
-  //     // Transform followers data to include isFollowedByUser flag
-  //     const items = followings.map((followingItem) => {
-  //       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  //       const { following, ...followingData } = followingItem.following;
-
-  //       return {
-  //         ...followingItem,
-  //         following: {
-  //           ...followingData,
-  //           isFollowedByUser: true,
-  //         },
-  //       };
-  //     });
-
-  //     // Return success response with pagination and followers data
   //     return {
-  //       message: 'Get followers successfully',
+  //       message: 'Get friends successfully',
   //       data: {
   //         currentPage: page,
   //         totalCount,
@@ -1424,7 +1429,8 @@ export class UserService {
   //         pageSize: limit,
   //         hasNextPage,
   //         hasPreviousPage,
-  //         items,
+  //         user,
+  //         items: friends,
   //       },
   //       statusCode: 200,
   //       date: new Date(),
@@ -1433,4 +1439,484 @@ export class UserService {
   //     handleDefaultError(error);
   //   }
   // }
+
+  async getFriendList({
+    userId,
+    limit = 10,
+    page = 1,
+  }: {
+    userId: string;
+    limit?: number;
+    page?: number;
+  }): Promise<
+    IPaginationResponseType<UserDataType> & {
+      data: {
+        user: UserDataType;
+      };
+    }
+  > {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: userDataSelect,
+      });
+
+      const whereQuery: Prisma.UserWhereInput = {
+        friends: {
+          some: {
+            status: FriendStatus.ACCEPTED,
+            OR: [{ userId: userId }, { friendId: userId }],
+          },
+        },
+      };
+
+      const selectData: Prisma.UserSelect = {
+        ...userDataSelect,
+        friends: {
+          select: friendDataSelect,
+        },
+      };
+
+      const [totalCount, friends] = await this.prisma.$transaction([
+        this.prisma.user.count({ where: whereQuery }),
+        this.prisma.user.findMany({
+          where: whereQuery,
+          skip: (page - 1) * limit,
+          take: limit,
+          select: selectData,
+        }),
+      ]);
+
+      const items = friends.map(({ friends, ...friend }) => {
+        return {
+          ...friend,
+          friend: friends.length > 0 ? friends[0] : null,
+        };
+      });
+
+      // Calculate pagination metadata
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPage;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      return {
+        message: 'Get accepted friends successfully',
+        data: {
+          currentPage: page,
+          totalCount,
+          totalPage,
+          pageSize: limit,
+          hasNextPage,
+          hasPreviousPage,
+          user,
+          items,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getPendingFriendsRequest({
+    userId,
+    limit = 10,
+    page = 1,
+  }: {
+    userId: string;
+    limit?: number;
+    page?: number;
+  }): Promise<
+    IPaginationResponseType<FriendDataType> & {
+      data: {
+        user: UserDataType;
+      };
+    }
+  > {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: userDataSelect,
+      });
+
+      const whereQuery: Prisma.FriendWhereInput = {
+        OR: [
+          {
+            friendId: userId,
+          },
+        ],
+        status: FriendStatus.PENDING,
+      };
+
+      const selectData: Prisma.FriendSelect = {
+        ...friendDataSelect,
+        user: {
+          select: userDataSelect,
+        },
+      };
+
+      const [totalCount, friends] = await this.prisma.$transaction([
+        this.prisma.friend.count({ where: whereQuery }),
+        this.prisma.friend.findMany({
+          where: whereQuery,
+          skip: (page - 1) * limit,
+          take: limit,
+          select: selectData,
+        }),
+      ]);
+
+      const items = friends.map(({ user, ...friend }) => {
+        return {
+          ...friend,
+          friend: user,
+        };
+      });
+
+      // Calculate pagination metadata
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPage;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      return {
+        message: 'Get friends successfully',
+        data: {
+          currentPage: page,
+          totalCount,
+          totalPage,
+          pageSize: limit,
+          hasNextPage,
+          hasPreviousPage,
+          user,
+          items,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async toggleFriendshipRequest({
+    userId,
+    currentUserId,
+  }: {
+    userId: string;
+    currentUserId: string;
+  }): Promise<IResponseType<FriendDataType>> {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: userDataSelect,
+      });
+
+      const currentUser = await this.validateUser({
+        userId: currentUserId,
+        selectData: userDataSelect,
+      });
+
+      const checkFriendshipRequest = await this.prisma.friend.findFirst({
+        where: {
+          userId: currentUser.id,
+          friendId: user.id,
+          isRequestedByMe: true,
+        },
+        select: friendDataSelectWithInclude,
+      });
+
+      const checkFriendshipRequestReceived = await this.prisma.friend.findFirst(
+        {
+          where: {
+            userId: user.id,
+            friendId: currentUser.id,
+            isRequestedByFriend: true,
+          },
+          select: friendDataSelectWithInclude,
+        },
+      );
+
+      // Remove friendship request
+      if (checkFriendshipRequest) {
+        await this.prisma.friend.delete({
+          where: {
+            id: checkFriendshipRequest.id,
+          },
+        });
+
+        return {
+          message: 'Friendship request removed successfully',
+          data: checkFriendshipRequest,
+          statusCode: 200,
+          date: new Date(),
+        };
+      }
+
+      // Accept friendship request
+      if (checkFriendshipRequestReceived) {
+        const updatedRequest = await this.prisma.friend.update({
+          where: {
+            id: checkFriendshipRequestReceived.id,
+          },
+          data: {
+            userId: currentUser.id,
+            friendId: user.id,
+            status: FriendStatus.ACCEPTED,
+            isRequestedByFriend: true,
+          },
+          select: friendDataSelectWithInclude,
+        });
+
+        return {
+          message: 'Friendship request accepted successfully',
+          data: updatedRequest,
+          statusCode: 200,
+          date: new Date(),
+        };
+      }
+
+      // Create new friendship request
+      const newFriendshipRequest = await this.prisma.friend.create({
+        data: {
+          userId: currentUser.id,
+          friendId: user.id,
+          status: FriendStatus.PENDING,
+          isRequestedByMe: true,
+        },
+        select: friendDataSelectWithInclude,
+      });
+
+      return {
+        message: 'Friendship request sent successfully',
+        data: newFriendshipRequest,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async acceptFriendshipRequest({
+    userId,
+    currentUserId,
+  }: {
+    userId: string;
+    currentUserId: string;
+  }): Promise<IResponseType<FriendDataType>> {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: {
+          id: true,
+        },
+      });
+
+      const friend = await this.validateUser({
+        userId: currentUserId,
+        selectData: {
+          id: true,
+        },
+      });
+
+      const checkFriendshipRequestReceived = await this.prisma.friend.findFirst(
+        {
+          where: {
+            userId: user.id,
+            friendId: currentUserId,
+            status: {
+              not: FriendStatus.REJECTED,
+            },
+            isRequestedByFriend: true,
+          },
+          select: friendDataSelectWithInclude,
+        },
+      );
+
+      if (!checkFriendshipRequestReceived) {
+        throw new BadRequestException('Friendship request not found');
+      }
+
+      if (checkFriendshipRequestReceived.status === FriendStatus.ACCEPTED) {
+        throw new BadRequestException('Friendship request already accepted');
+      }
+
+      if (checkFriendshipRequestReceived.status === FriendStatus.BLOCKED) {
+        throw new BadRequestException('You blocked this user');
+      }
+
+      const [, , acceptedFriendshipRequest] = await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: { friendCount: { increment: 1 } },
+        }),
+        this.prisma.user.update({
+          where: { id: friend.id },
+          data: { friendCount: { increment: 1 } },
+        }),
+        this.prisma.friend.update({
+          where: { id: checkFriendshipRequestReceived.id },
+          data: {
+            userId: user.id,
+            friendId: friend.id,
+            status: FriendStatus.ACCEPTED,
+            isRequestedByFriend: true,
+          },
+          select: friendDataSelectWithInclude,
+        }),
+      ]);
+
+      return {
+        message: 'Friendship request accepted successfully',
+        data: {
+          ...acceptedFriendshipRequest,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async rejectFriendshipRequest({
+    userId,
+    currentUserId,
+  }: {
+    userId: string;
+    currentUserId: string;
+  }): Promise<IResponseType<FriendDataType>> {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: userDataSelect,
+      });
+
+      const checkFriendshipRequest = await this.prisma.friend.findFirst({
+        where: {
+          userId: user.id,
+          friendId: currentUserId,
+          status: FriendStatus.PENDING,
+        },
+        select: friendDataSelectWithInclude,
+      });
+
+      if (!checkFriendshipRequest) {
+        throw new BadRequestException('Friendship request not found');
+      }
+
+      const rejectedFriendshipRequest = await this.prisma.friend.delete({
+        where: { id: checkFriendshipRequest.id },
+        select: friendDataSelectWithInclude,
+      });
+      rejectedFriendshipRequest.status = 'REJECTED';
+
+      return {
+        message: 'Friendship request rejected successfully',
+        data: rejectedFriendshipRequest,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async toggleBlockFriend({
+    userId,
+    currentUserId,
+  }: {
+    userId: string;
+    currentUserId: string;
+  }): Promise<IResponseType<FriendDataType>> {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: userDataSelect,
+      });
+
+      const currentUser = await this.validateUser({
+        userId: currentUserId,
+        selectData: userDataSelect,
+      });
+
+      const checkFriend = await this.prisma.friend.findFirst({
+        where: {
+          OR: [
+            { userId: user.id, friendId: currentUser.id },
+            { userId: currentUser.id, friendId: user.id },
+          ],
+        },
+      });
+
+      console.log(checkFriend);
+
+      if (checkFriend?.status === FriendStatus.BLOCKED) {
+        const blockedFriend = await this.prisma.friend.delete({
+          where: {
+            id: checkFriend.id,
+          },
+          select: friendDataSelectWithInclude,
+        });
+
+        return {
+          message: 'Friend unblocked successfully',
+          data: {
+            ...blockedFriend,
+          },
+          statusCode: 200,
+          date: new Date(),
+        };
+      }
+
+      const isFriend = checkFriend?.status === FriendStatus.ACCEPTED;
+      console.log(isFriend);
+
+      if (isFriend) {
+        await this.prisma.$transaction([
+          // Delete friendship
+
+          this.prisma.friend.delete({
+            where: {
+              id: checkFriend.id,
+            },
+          }),
+
+          // Decrement friend count of current user
+
+          this.prisma.user.updateMany({
+            where: {
+              id: {
+                in: [user.id, currentUser.id],
+              },
+            },
+            data: {
+              friendCount: { decrement: 1 },
+            },
+          }),
+        ]);
+      }
+
+      // Create blocked friendship
+      const newBlockedFriend = await this.prisma.friend.create({
+        data: {
+          userId: currentUser.id,
+          friendId: user.id,
+          status: FriendStatus.BLOCKED,
+        },
+        select: friendDataSelectWithInclude,
+      });
+
+      return {
+        message: 'Friend blocked successfully',
+        data: {
+          ...newBlockedFriend,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
 }

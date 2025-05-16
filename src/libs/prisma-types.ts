@@ -34,6 +34,7 @@ export const userDataSelect = {
   postCount: true,
   followerCount: true,
   followingCount: true,
+  friendCount: true,
   userType: {
     select: userTypeDataSelect,
   },
@@ -53,6 +54,15 @@ export type UserDataWithIsFollowedType = Prisma.UserGetPayload<{
 }> & {
   isFollowedByUser: boolean;
 };
+
+export type UserDataWithIsFriendType = Prisma.UserGetPayload<{
+  select: typeof userDataSelect;
+}> & {
+  isFriend: boolean;
+};
+
+export type UserDataWithStatusesType = UserDataWithIsFollowedType &
+  UserDataWithIsFriendType;
 
 export const userSessionDataSelect = {
   id: true,
@@ -221,4 +231,34 @@ export const notificationDataSelect = {
 
 export type NotificationDataType = Prisma.NotificationGetPayload<{
   select: typeof notificationDataSelect;
+}>;
+
+export const friendDataSelect = {
+  id: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.FriendSelect;
+
+export const friendDataInclude = {
+  user: {
+    select: userDataSelect,
+  },
+  friend: {
+    select: userDataSelect,
+  },
+} satisfies Prisma.FriendInclude;
+
+export const friendDataSelectWithInclude = {
+  ...friendDataSelect,
+  ...friendDataInclude,
+} satisfies Prisma.FriendSelect;
+
+export type FriendDataType = Prisma.FriendGetPayload<{
+  select: typeof friendDataSelect;
+}>;
+
+export type FriendDataWithUserAndFriend = Prisma.FriendGetPayload<{
+  select: typeof friendDataSelect;
+  include: typeof friendDataInclude;
 }>;

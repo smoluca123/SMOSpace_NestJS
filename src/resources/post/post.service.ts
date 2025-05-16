@@ -35,6 +35,7 @@ import {
   UpdatePostDto,
 } from 'src/resources/post/dto/post.dto';
 import { S3Service } from 'src/services/aws/s3/s3.service';
+import { NotificationService } from 'src/resources/notification/notification.service';
 
 @Injectable()
 export class PostService {
@@ -42,6 +43,7 @@ export class PostService {
     private readonly prisma: PrismaService,
     private readonly postGateway: PostGateway,
     private readonly s3Service: S3Service,
+    private readonly notificationService: NotificationService,
   ) {}
   async validatePost<DataType = PostDataType>(
     postId: string,
@@ -710,7 +712,10 @@ export class PostService {
     }
 
     // Delete post images
-    this.s3Service.deletePostImages({ postId });
+    await this.s3Service.deletePostImages({ postId });
+
+    // Delete all notifications related to this post
+    await this.notificationService.deletePostRelatedNotifications(postId);
 
     if (userId) {
       // If userId provided, verify user exists and has permission
@@ -723,7 +728,7 @@ export class PostService {
       }
 
       if (post.authorId !== userId) {
-        throw new ForbiddenException('This comment is not yours');
+        throw new ForbiddenException('This post is not yours');
       }
 
       // Delete post and decrement user's post count in a transaction

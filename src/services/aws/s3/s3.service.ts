@@ -143,11 +143,13 @@ export class S3Service {
             id: userId,
           },
         },
-        post: {
-          connect: {
-            id: postId,
+        ...(postId && {
+          post: {
+            connect: {
+              id: postId,
+            },
           },
-        },
+        }),
       },
       select: mediaDataSelect,
     });

@@ -1,9 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { FriendStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsDate,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -143,4 +145,12 @@ export class RefreshTokenDto {
 
 export class RefreshTokenResponseDto {
   accessToken: string;
+}
+
+export type AllowedFriendStatus = Exclude<FriendStatus, 'PENDING' | 'BLOCKED'>;
+export class ChangeFriendshipStatusDto {
+  @ApiProperty({ default: FriendStatus.ACCEPTED })
+  @IsIn([FriendStatus.REJECTED, FriendStatus.ACCEPTED])
+  @IsNotEmpty()
+  status: AllowedFriendStatus;
 }

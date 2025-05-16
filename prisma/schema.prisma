@@ -71,6 +71,7 @@ model User {
   postCount      Int       @default(0) @map("post_count")
   followerCount  Int       @default(0) @map("follower_count")
   followingCount Int       @default(0) @map("following_count")
+  friendCount    Int       @default(0) @map("friend_count")
 
   userType         UserType           @relation(fields: [type], references: [id], onDelete: Restrict)
   UserSession      UserSession[]
@@ -88,7 +89,9 @@ model User {
   // Additional info
   userAdditionalInfoId String?             @unique
   additionalInfo       UserAdditionalInfo? @relation(fields: [userAdditionalInfoId], references: [id])
-  Media                Media[]
+  media                Media[]
+  friends              Friend[]
+  friendOf             Friend[]            @relation("UserFriend")
 
   @@index([username, email, type])
   @@map("users")
@@ -121,6 +124,32 @@ model UserType {
   User     User[]
 
   @@map("user_types")
+}
+
+model Friend {
+  id                  String       @id @default(uuid())
+  userId              String       @map("user_id")
+  friendId            String       @map("friend_id")
+  status              FriendStatus @default(PENDING)
+  isRequestedByMe     Boolean      @default(false) @map("is_requested_by_me")
+  isRequestedByFriend Boolean      @default(false) @map("is_requested_by_friend")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  user   User @relation(fields: [userId], references: [id])
+  friend User @relation("UserFriend", fields: [friendId], references: [id])
+
+  @@unique([userId, friendId])
+  @@index([userId, status, isRequestedByMe])
+  @@index([friendId, status, isRequestedByFriend])
+  @@map("friends")
+}
+
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
 }
 
 // model user_sessions {
@@ -234,7 +263,7 @@ model PostComment {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  post    Post          @relation(fields: [postId], references: [id], onDelete: Restrict)
+  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
   author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
   replyTo PostComment?  @relation("CommentReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies PostComment[] @relation("CommentReplies")
