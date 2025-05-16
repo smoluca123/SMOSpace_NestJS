@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreatePostDto {
   @ApiProperty({ default: '', required: true })
@@ -7,9 +15,20 @@ export class CreatePostDto {
   @IsNotEmpty()
   content: string;
 
-  @ApiProperty({ default: false })
+  @ApiProperty({ default: 'false' })
   @IsBoolean()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true';
+    }
+    return Boolean(value);
+  })
   isPrivate: boolean;
+
+  @ApiProperty({ type: 'array', items: { type: 'string', format: 'binary' } })
+  @IsArray()
+  @IsOptional()
+  images: Express.Multer.File[];
 }
 
 export class UpdatePostDto {
@@ -17,7 +36,13 @@ export class UpdatePostDto {
   @IsString()
   content: string;
 
-  @ApiProperty({ default: false })
+  @ApiProperty({ default: 'false' })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true';
+    }
+    return Boolean(value);
+  })
   @IsBoolean()
   isPrivate: boolean;
 }

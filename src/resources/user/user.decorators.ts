@@ -16,6 +16,7 @@ import { FileUploadInterceptor } from 'src/interceptors/file-upload.interceptor'
 import { RolesLevel } from 'src/interfaces/interfaces.global';
 
 import {
+  ChangeFriendshipStatusDto,
   UserAvatarUpdateDto,
   UserCoverImageUpdateDto,
 } from 'src/resources/user/dto/user.dto';
@@ -35,9 +36,10 @@ export const getAllUsersDecorator = () =>
         'Search users by username, email, full name, or display name',
     }),
     ApiQuery({
-      name: 'followerId',
+      name: 'currentUserId',
       required: false,
-      description: 'Optional follower ID (user ID) to check follow status',
+      description:
+        'Optional current user ID (user ID) to check follow, friend status',
     }),
   );
 
@@ -68,10 +70,10 @@ export const getUserInformationDecorator = () =>
       description: 'User ID or username to retrieve',
     }),
     ApiQuery({
-      name: 'followerId',
+      name: 'currentUserId',
       required: false,
       description:
-        'Optional follower ID to check if this user follows the target user',
+        'Optional current user ID to check if this user follows the target user',
     }),
   );
 
@@ -254,4 +256,94 @@ export const getFollowingsDecorator = () =>
     }),
     UseGuards(JwtTokenVerifyGuard),
     ApiQueryLimitAndPage(),
+  );
+
+export const getFriendListDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get friends of current user',
+      description: 'Retrieve the friends of the authenticated user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+    ApiQueryLimitAndPage(),
+  );
+
+export const getPendingFriendsRequestDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get pending friends of current user',
+      description: 'Retrieve the pending friends of the authenticated user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+    ApiQueryLimitAndPage(),
+  );
+
+export const toggleFriendshipRequestDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Toggle friendship request',
+      description: 'Toggle friendship request for a specific user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+  );
+
+export const changeFriendshipStatusDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Change friendship status',
+      description: 'Change friendship status for a specific user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+    ApiBody({
+      type: ChangeFriendshipStatusDto,
+      description: 'Friendship status to change',
+    }),
+  );
+
+export const acceptFriendshipRequestDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Accept friendship request',
+      description: 'Accept friendship request for a specific user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+  );
+
+export const toggleBlockFriendDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Toggle block friend',
+      description: 'Toggle block friend for a specific user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
   );
