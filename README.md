@@ -1,73 +1,139 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# SMOSpace Server
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+SMOSpace Server is a backend API built with NestJS, providing services and API endpoints for the SMOSpace application.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🚀 Key Features
 
-## Description
+- User Authentication and Authorization (JWT)
+- User and Profile Management
+- AWS S3 Integration for File Storage
+- Redis Caching System
+- Email Service with MailPace
+- WebSocket for Real-time Communication
+- Rate Limiting and Security
+- OpenAI Integration
+- Database with Prisma ORM
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 🛠 Technologies Used
 
-## Installation
+- **Framework**: NestJS
+- **Database**: Prisma ORM
+- **Cache**: Redis
+- **Storage**: AWS S3
+- **Email**: MailPace
+- **Authentication**: JWT, Passport
+- **Real-time**: Socket.IO
+- **API Documentation**: Swagger
+- **Testing**: Jest
+
+## 📋 System Requirements
+
+- Node.js (Latest LTS version)
+- Bun or Yarn or npm
+- Redis server
+- PostgreSQL database
+
+## 🚀 Installation
+
+1. Clone repository:
 
 ```bash
-$ yarn install
+git clone [repository-url]
+cd server
 ```
 
-## Running the app
+2. Install dependencies:
 
 ```bash
-# development
-$ yarn run start
+# Using Bun
+bun install
 
-# watch mode
-$ yarn run start:dev
+# Or using Yarn
+yarn install
 
-# production mode
-$ yarn run start:prod
+# Or using npm
+npm install
 ```
 
-## Test
+3. Environment Configuration:
+
+- Create `.env` file based on `.env.example`
+- Fill in required environment variables
+
+4. Run migrations:
 
 ```bash
-# unit tests
-$ yarn run test
+npx prisma migrate dev
+```
+
+5. Start the server:
+
+```bash
+# Development
+bun run dev
+# or
+yarn dev
+# or
+npm run dev
+
+# Production
+bun run start:prod
+# or
+yarn start:prod
+# or
+npm run start:prod
+```
+
+## 📚 API Documentation
+
+API documentation is available at the `/api` endpoint when the server is running.
+
+## 🧪 Testing
+
+```bash
+# Unit tests
+bun run test
 
 # e2e tests
-$ yarn run test:e2e
+bun run test:e2e
 
-# test coverage
-$ yarn run test:cov
+# Test coverage
+bun run test:cov
 ```
 
-## Support
+## 📦 Project Structure
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```
+src/
+├── configs/         # Application configurations
+├── constants/       # Constants and enums
+├── decorators/      # Custom decorators
+├── guards/          # Authentication guards
+├── interceptors/    # Request/Response interceptors
+├── interfaces/      # TypeScript interfaces
+├── jwt/            # JWT configuration
+├── libs/           # Shared libraries
+├── middlewares/    # Custom middlewares
+├── pipes/          # Custom pipes
+├── prisma/         # Prisma schema and migrations
+├── resources/      # API resources and controllers
+├── services/       # Business logic services
+├── strategy/       # Authentication strategies
+└── utils/          # Utility functions
+```
 
-## Stay in touch
+## 🔒 Security
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- JWT Authentication
+- Rate Limiting
+- CORS Protection
+- Request Validation
+- Secure Headers
 
-## License
+## 🤝 Contributing
 
-Nest is [MIT licensed](LICENSE).
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## 📝 License
+
+[MIT License](LICENSE)
