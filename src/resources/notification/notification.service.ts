@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { EntityType, NotificationPriority, Prisma } from '@prisma/client';
 import { handleDefaultError } from 'src/global/functions.global';
-import { IPaginationResponseType } from 'src/interfaces/interfaces.global';
+import {
+  IPaginationResponseType,
+  IResponseType,
+} from 'src/interfaces/interfaces.global';
 import {
   notificationDataSelect,
   NotificationDataType,
@@ -73,9 +76,13 @@ export class NotificationService {
   async deleteCommentNotification({
     recipientId,
     senderId,
+    postId,
+    commentId,
   }: {
     recipientId: string;
     senderId: string;
+    postId: string;
+    commentId: string;
   }) {
     try {
       const notification = await this.prisma.notification.findFirst({
@@ -85,6 +92,22 @@ export class NotificationService {
               in: ['COMMENT_POST', 'REPLY_COMMENT', 'COMMENT_MENTION'],
             },
           },
+          ...(postId && {
+            AND: [
+              {
+                metadata: {
+                  path: ['postId'],
+                  equals: postId,
+                },
+              },
+              {
+                metadata: {
+                  path: ['commentId'],
+                  equals: commentId,
+                },
+              },
+            ],
+          }),
           entityType: EntityType.COMMENT,
           isDeleted: false,
           recipientId,
@@ -346,6 +369,41 @@ export class NotificationService {
           hasPreviousPage,
         },
         statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deletePostRelatedNotifications(
+    postId: string,
+  ): Promise<IResponseType<null>> {
+    try {
+      // Delete all notifications that have this postId in their metadata
+      await this.prisma.notification.deleteMany({
+        where: {
+          metadata: {
+            path: ['postId'],
+            equals: postId,
+          },
+          // type: {
+          //   type: {
+          //     in: [
+          //       'COMMENT_POST',
+          //       'REPLY_COMMENT',
+          //       'LIKE_POST',
+          //       'COMMENT_MENTION',
+
+          //     ],
+          //   },
+          // },
+        },
+      });
+      return {
+        message: 'Post related notifications deleted successfully',
+        data: null,
+        statusCode: 204,
         date: new Date(),
       };
     } catch (error) {

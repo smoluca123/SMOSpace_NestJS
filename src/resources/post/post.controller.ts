@@ -7,6 +7,7 @@ import {
   Post,
   Put,
   Query,
+  UploadedFiles,
   UseGuards,
 } from '@nestjs/common';
 import { PostService } from './post.service';
@@ -179,8 +180,12 @@ export class PostController {
   createPost(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
     @Body() data: CreatePostDto,
+    @UploadedFiles() images: Express.Multer.File[],
   ) {
-    return this.postService.createPost(decodedAccessToken, data);
+    return this.postService.createPost(decodedAccessToken, {
+      ...data,
+      images,
+    });
   }
 
   @Put('admin/:postId')

@@ -540,6 +540,8 @@ export class PostCommentService {
         await this.notification.deleteCommentNotification({
           recipientId: commentExist.post.authorId,
           senderId: commentExist.authorId,
+          postId: commentExist.postId,
+          commentId: commentExist.id,
         });
       }
 

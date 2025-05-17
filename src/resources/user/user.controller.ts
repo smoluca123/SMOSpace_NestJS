@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -15,14 +16,19 @@ import { UserService } from './user.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   banUserDecorator,
+  changeFriendshipStatusDecorator,
   followUserDecorator,
+  getFriendListDecorator,
   getAllUsersDecorator,
   getFollowersByIdDecorator,
   getFollowersDecorator,
   getFollowingsByIdDecorator,
   getFollowingsDecorator,
   getInformationDecorator,
+  getPendingFriendsRequestDecorator,
   getUserInformationDecorator,
+  toggleBlockFriendDecorator,
+  toggleFriendshipRequestDecorator,
   updateInformationDecorator,
   updateUserAvatarDecorator,
   updateUserCoverImageDecorator,
@@ -32,6 +38,7 @@ import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
 import {
   BanUserDto,
+  ChangeFriendshipStatusDto,
   UpdateProfileDto,
   UpdateUserDto,
   UserActiveByCodeDto,
@@ -42,6 +49,7 @@ import { FileIsImageValidationPipe } from 'src/pipes/ImageTypeValidator.pipe';
 import { normalizePaginationParams } from 'src/utils/utils';
 import { AuthGuard } from '@nestjs/passport';
 import { RoleGuard } from 'src/guards/role.guard';
+import { FriendStatus } from '@prisma/client';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
@@ -49,6 +57,44 @@ import { RoleGuard } from 'src/guards/role.guard';
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  @Get('/friends')
+  @getFriendListDecorator()
+  async getFriendList(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('page') _page?: string,
+    @Query('limit') _limit?: string,
+  ) {
+    const { userId } = decodedAccessToken;
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.userService.getFriendList({
+      userId,
+      limit,
+      page,
+    });
+  }
+
+  @Get('/friends/pending')
+  @getPendingFriendsRequestDecorator()
+  async getPendingFriendsRequest(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('page') _page?: string,
+    @Query('limit') _limit?: string,
+  ) {
+    const { userId } = decodedAccessToken;
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.userService.getPendingFriendsRequest({
+      userId,
+      limit,
+      page,
+    });
+  }
 
   @Get('/followers')
   @getFollowersDecorator()
@@ -120,7 +166,7 @@ export class UserController {
     @Query('page') _page: string,
     @Query('limit') _limit: string,
     @Query('keywords') keywords: string,
-    @Query('followerId') followerId: string,
+    @Query('currentUserId') currentUserId?: string,
   ) {
     const { limit, page } = normalizePaginationParams({
       limit: +_limit,
@@ -130,7 +176,7 @@ export class UserController {
       keywords,
       limit,
       page,
-      followerId,
+      currentUserId,
     });
   }
 
@@ -146,9 +192,9 @@ export class UserController {
   @getUserInformationDecorator()
   async getUserInformation(
     @Param('userId') userId: string,
-    @Query('followerId') followerId: string,
+    @Query('currentUserId') currentUserId?: string,
   ) {
-    return this.userService.getUserInformation({ userId, followerId });
+    return this.userService.getUserInformation({ userId, currentUserId });
   }
 
   @Post('/avatar/:userId')
@@ -257,6 +303,53 @@ export class UserController {
     return this.userService.followUser({
       userId,
       followerUserId: decodedAccessToken.userId,
+    });
+  }
+
+  @Post('/friend/:userId')
+  @toggleFriendshipRequestDecorator()
+  toggleFriendshipRequest(
+    @Param('userId') userId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    return this.userService.toggleFriendshipRequest({
+      userId,
+      currentUserId: decodedAccessToken.userId,
+    });
+  }
+
+  @Post('/friend/status/:userId')
+  @changeFriendshipStatusDecorator()
+  changeFriendshipStatus(
+    @Param('userId') userId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Body() data: ChangeFriendshipStatusDto,
+  ) {
+    switch (data.status) {
+      case FriendStatus.ACCEPTED:
+        return this.userService.acceptFriendshipRequest({
+          userId,
+          currentUserId: decodedAccessToken.userId,
+        });
+      case FriendStatus.REJECTED:
+        return this.userService.rejectFriendshipRequest({
+          userId,
+          currentUserId: decodedAccessToken.userId,
+        });
+      default:
+        throw new BadRequestException('Invalid friendship status');
+    }
+  }
+
+  @Post('/friend/block/:userId')
+  @toggleBlockFriendDecorator()
+  toggleBlockFriend(
+    @Param('userId') userId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    return this.userService.toggleBlockFriend({
+      userId,
+      currentUserId: decodedAccessToken.userId,
     });
   }
 
