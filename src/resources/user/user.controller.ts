@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   MaxFileSizeValidator,
   Param,
@@ -33,6 +34,7 @@ import {
   updateUserAvatarDecorator,
   updateUserCoverImageDecorator,
   updateUserInformationDecorator,
+  removeFriendDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -396,5 +398,17 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.userService.updateUserInformation(userId, updateUserDto);
+  }
+
+  @Delete('/friend/:userId')
+  @removeFriendDecorator()
+  removeFriend(
+    @Param('userId') userId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    return this.userService.removeFriend({
+      userId,
+      currentUserId: decodedAccessToken.userId,
+    });
   }
 }

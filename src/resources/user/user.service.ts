@@ -1727,7 +1727,6 @@ export class UserService {
             status: {
               not: FriendStatus.REJECTED,
             },
-            isRequestedByFriend: true,
           },
           select: friendDataSelectWithInclude,
         },
@@ -1760,7 +1759,6 @@ export class UserService {
             userId: user.id,
             friendId: friend.id,
             status: FriendStatus.ACCEPTED,
-            isRequestedByFriend: true,
           },
           select: friendDataSelectWithInclude,
         }),
@@ -1814,6 +1812,77 @@ export class UserService {
       return {
         message: 'Friendship request rejected successfully',
         data: rejectedFriendshipRequest,
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async removeFriend({
+    userId,
+    currentUserId,
+  }: {
+    userId: string;
+    currentUserId: string;
+  }): Promise<IResponseType<FriendDataType>> {
+    try {
+      const user = await this.validateUser({
+        userId,
+        selectData: userDataSelect,
+      });
+
+      const currentUser = await this.validateUser({
+        userId: currentUserId,
+        selectData: userDataSelect,
+      });
+
+      const checkFriend = await this.prisma.friend.findFirst({
+        where: {
+          OR: [
+            { userId: user.id, friendId: currentUser.id },
+            { userId: currentUser.id, friendId: user.id },
+          ],
+          status: FriendStatus.ACCEPTED,
+        },
+      });
+
+      if (!checkFriend) {
+        throw new BadRequestException('Friend not found');
+      }
+
+      const [, removedFriend] = await this.prisma.$transaction([
+        this.prisma.user.updateMany({
+          where: {
+            id: {
+              in: [user.id, currentUser.id],
+            },
+          },
+          data: {
+            friendCount: { decrement: 1 },
+          },
+        }),
+        this.prisma.friend.delete({
+          where: {
+            id: checkFriend.id,
+          },
+          select: friendDataSelectWithInclude,
+        }),
+      ]);
+
+      // Always return the current user as the friend
+      if (removedFriend.friend.id !== currentUser.id) {
+        removedFriend.friend = currentUser;
+      }
+
+      if (removedFriend.user.id === currentUser.id) {
+        removedFriend.user = user;
+      }
+
+      return {
+        message: 'Friend removed successfully',
+        data: removedFriend,
         statusCode: 200,
         date: new Date(),
       };

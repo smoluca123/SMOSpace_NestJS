@@ -347,3 +347,17 @@ export const toggleBlockFriendDecorator = () =>
     }),
     UseGuards(JwtTokenVerifyGuard),
   );
+
+export const removeFriendDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Remove friend',
+      description: 'Remove friend for a specific user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+  );
