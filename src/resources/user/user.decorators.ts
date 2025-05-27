@@ -258,7 +258,7 @@ export const getFollowingsDecorator = () =>
     ApiQueryLimitAndPage(),
   );
 
-export const getFriendListDecorator = () =>
+export const getMyFriendListDecorator = () =>
   applyDecorators(
     ApiOperation({
       summary: 'Get friends of current user',
@@ -271,6 +271,36 @@ export const getFriendListDecorator = () =>
     }),
     UseGuards(JwtTokenVerifyGuard),
     ApiQueryLimitAndPage(),
+  );
+export const getFriendListDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get friends of current user',
+      description: 'Retrieve the friends of the authenticated user',
+    }),
+    ApiParam({
+      name: 'userId',
+      description: 'ID of the user whose friends will be retrieved',
+    }),
+    ApiQueryLimitAndPage(),
+  );
+
+export const getFriendByUserIdDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get friend of current user',
+      description: 'Retrieve the friend of the authenticated user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+    ApiParam({
+      name: 'userId',
+      description: 'ID of the user whose friend will be retrieved',
+    }),
   );
 
 export const getPendingFriendsRequestDecorator = () =>

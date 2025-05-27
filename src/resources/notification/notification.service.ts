@@ -15,6 +15,7 @@ import { NotificationGateway } from 'src/resources/notification/notification.gat
 import {
   INotificationCommentPayload,
   INotificationFollowPayload,
+  INotificationFriendRequestPayload,
   INotificationReplyCommentPayload,
 } from 'src/resources/notification/notification.interfaces';
 
@@ -263,6 +264,79 @@ export class NotificationService {
     }
   }
 
+  async createFriendRequestNotification(
+    payload: INotificationFriendRequestPayload,
+  ) {
+    try {
+      const message = this.formatMessage(
+        NOTIFICATION_MESSAGES.FRIEND_REQUEST.message,
+        { username: payload.senderData.username },
+      );
+
+      const newNotificationData: Prisma.NotificationCreateInput = {
+        isDeleted: false,
+        content: {
+          title: NOTIFICATION_MESSAGES.FRIEND_REQUEST.title,
+          message,
+        },
+        entityType: EntityType.FRIENDSHIP,
+        metadata: {
+          friend: {
+            id: payload.friendId,
+            username: payload.senderData.username,
+            fullName: payload.senderData.fullName,
+            avatar: payload.senderData.avatar,
+          },
+        },
+        priority: NotificationPriority.NORMAL,
+        readAt: null,
+        isRead: false,
+        type: {
+          connectOrCreate: {
+            where: {
+              type: 'FRIEND_REQUEST',
+            },
+            create: {
+              type: 'FRIEND_REQUEST',
+            },
+          },
+        },
+        createdAt: new Date(),
+        sender: {
+          connect: { id: payload.senderId },
+        },
+        recipient: {
+          connect: { id: payload.recipientId },
+        },
+      };
+
+      const existingNotification = await this.prisma.notification.findFirst({
+        where: {
+          recipientId: payload.recipientId,
+          senderId: payload.senderId,
+          type: {
+            type: 'FRIEND_REQUEST',
+          },
+        },
+      });
+      if (existingNotification) {
+        return this.prisma.notification.update({
+          where: { id: existingNotification.id },
+          data: newNotificationData,
+        });
+      }
+
+      const newNotification = await this.prisma.notification.create({
+        data: newNotificationData,
+        select: notificationDataSelect,
+      });
+
+      this.notificationGateway.emitNewNotification(newNotification);
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   async createReplyCommentNotification(
     payload: INotificationReplyCommentPayload,
   ) {
@@ -402,6 +476,41 @@ export class NotificationService {
       });
       return {
         message: 'Post related notifications deleted successfully',
+        data: null,
+        statusCode: 204,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deleteFriendRequestNotifications({
+    userId,
+    friendId,
+  }: {
+    userId: string;
+    friendId: string;
+  }): Promise<IResponseType<null>> {
+    try {
+      // Delete all notifications that have this postId in their metadata
+      await this.prisma.notification.deleteMany({
+        where: {
+          senderId: userId,
+          recipientId: friendId,
+          metadata: {
+            path: ['friend', 'id'],
+            equals: friendId,
+          },
+          type: {
+            type: {
+              in: ['FRIEND_REQUEST'],
+            },
+          },
+        },
+      });
+      return {
+        message: 'Friend request notifications deleted successfully',
         data: null,
         statusCode: 204,
         date: new Date(),

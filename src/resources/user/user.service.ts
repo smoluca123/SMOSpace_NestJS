@@ -1456,43 +1456,79 @@ export class UserService {
     }
   > {
     try {
-      const user = await this.validateUser({
-        userId,
-        selectData: userDataSelect,
-      });
-
-      const whereQuery: Prisma.UserWhereInput = {
-        friends: {
-          some: {
+      // Validate user and get friend relationships in parallel
+      const [user, friendRelationships] = await Promise.all([
+        this.validateUser({
+          userId,
+          selectData: userDataSelect,
+        }),
+        this.prisma.friend.findMany({
+          where: {
+            OR: [{ userId }, { friendId: userId }],
             status: FriendStatus.ACCEPTED,
-            OR: [{ userId: userId }, { friendId: userId }],
           },
-        },
-      };
-
-      const selectData: Prisma.UserSelect = {
-        ...userDataSelect,
-        friends: {
-          select: friendDataSelect,
-        },
-      };
-
-      const [totalCount, friends] = await this.prisma.$transaction([
-        this.prisma.user.count({ where: whereQuery }),
-        this.prisma.user.findMany({
-          where: whereQuery,
-          skip: (page - 1) * limit,
-          take: limit,
-          select: selectData,
+          select: {
+            ...friendDataSelect,
+            friendId: true,
+            userId: true,
+          },
         }),
       ]);
 
-      const items = friends.map(({ friends, ...friend }) => {
+      // Get the IDs of all friends (excluding the current user)
+      const friendIds = friendRelationships.map((rel) =>
+        rel.userId === userId ? rel.friendId : rel.userId,
+      );
+
+      // If no friends, return early with empty results
+      if (friendIds.length === 0) {
         return {
-          ...friend,
-          friend: friends.length > 0 ? friends[0] : null,
+          message: 'Get accepted friends successfully',
+          data: {
+            currentPage: page,
+            totalCount: 0,
+            totalPage: 0,
+            pageSize: limit,
+            hasNextPage: false,
+            hasPreviousPage: false,
+            user,
+            items: [],
+          },
+          statusCode: 200,
+          date: new Date(),
         };
+      }
+
+      // Create a map for faster friend relationship lookup
+      const friendRelationshipMap = new Map();
+      friendRelationships.forEach((rel) => {
+        const friendId = rel.userId === userId ? rel.friendId : rel.userId;
+        friendRelationshipMap.set(friendId, rel);
       });
+
+      const [totalCount, friends] = await this.prisma.$transaction([
+        this.prisma.user.count({
+          where: {
+            id: { in: friendIds },
+          },
+        }),
+        this.prisma.user.findMany({
+          where: {
+            id: { in: friendIds },
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+          select: {
+            ...userDataSelect,
+          },
+        }),
+      ]);
+
+      // Map friends to include relationship data using the map (O(n) instead of O(n²))
+      const items = friends.map((friend) => ({
+        ...friend,
+        // friend: friendRelationshipMap.get(friend.id) || null,
+      }));
 
       // Calculate pagination metadata
       const totalPage = Math.ceil(totalCount / limit);
@@ -1511,6 +1547,75 @@ export class UserService {
           user,
           items,
         },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getFriendByUserId({
+    currentUserId,
+    friendId,
+  }: {
+    currentUserId: string;
+    friendId: string;
+  }): Promise<IResponseType<UserDataType>> {
+    try {
+      // Validate user and get friend relationships in parallel
+      const [, , friendRelationship] = await Promise.all([
+        this.validateUser({
+          userId: currentUserId,
+          selectData: userDataSelect,
+        }),
+        this.validateUser({
+          userId: friendId,
+          selectData: userDataSelect,
+        }),
+        this.prisma.friend.findFirst({
+          where: {
+            AND: [
+              {
+                OR: [
+                  { userId: currentUserId, friendId: friendId },
+                  { userId: friendId, friendId: currentUserId },
+                ],
+                status: FriendStatus.ACCEPTED,
+              },
+            ],
+          },
+          select: {
+            ...friendDataSelect,
+            friendId: true,
+            userId: true,
+          },
+        }),
+      ]);
+
+      if (!friendRelationship) {
+        return {
+          message: 'Get accepted friends successfully',
+          data: null,
+          statusCode: 200,
+          date: new Date(),
+        };
+      }
+
+      // Get the IDs of all friends (excluding the current user)
+      const friendUserId =
+        friendRelationship.userId === currentUserId
+          ? friendRelationship.friendId
+          : friendRelationship.userId;
+
+      const friendUserData = await this.validateUser({
+        userId: friendUserId,
+        selectData: userDataSelect,
+      });
+
+      return {
+        message: 'Get accepted friends successfully',
+        data: friendUserData,
         statusCode: 200,
         date: new Date(),
       };
@@ -1644,6 +1749,12 @@ export class UserService {
           },
         });
 
+        // Delete friend request notifications
+        await this.notificationService.deleteFriendRequestNotifications({
+          userId: currentUser.id,
+          friendId: user.id,
+        });
+
         return {
           message: 'Friendship request removed successfully',
           data: checkFriendshipRequest,
@@ -1667,6 +1778,12 @@ export class UserService {
           select: friendDataSelectWithInclude,
         });
 
+        // Delete friend request notifications
+        await this.notificationService.deleteFriendRequestNotifications({
+          userId: currentUserId,
+          friendId: userId,
+        });
+
         return {
           message: 'Friendship request accepted successfully',
           data: updatedRequest,
@@ -1684,6 +1801,14 @@ export class UserService {
           isRequestedByMe: true,
         },
         select: friendDataSelectWithInclude,
+      });
+
+      // Create friend request notifications
+      await this.notificationService.createFriendRequestNotification({
+        recipientId: user.id,
+        senderId: currentUser.id,
+        senderData: currentUser,
+        friendId: user.id,
       });
 
       return {
@@ -1764,6 +1889,12 @@ export class UserService {
         }),
       ]);
 
+      // Delete friend request notifications
+      await this.notificationService.deleteFriendRequestNotifications({
+        userId: currentUserId,
+        friendId: userId,
+      });
+
       return {
         message: 'Friendship request accepted successfully',
         data: {
@@ -1808,6 +1939,12 @@ export class UserService {
         select: friendDataSelectWithInclude,
       });
       rejectedFriendshipRequest.status = 'REJECTED';
+
+      // Delete friend request notifications
+      await this.notificationService.deleteFriendRequestNotifications({
+        userId: currentUserId,
+        friendId: userId,
+      });
 
       return {
         message: 'Friendship request rejected successfully',
@@ -1918,8 +2055,6 @@ export class UserService {
         },
       });
 
-      console.log(checkFriend);
-
       if (checkFriend?.status === FriendStatus.BLOCKED) {
         const blockedFriend = await this.prisma.friend.delete({
           where: {
@@ -1939,7 +2074,6 @@ export class UserService {
       }
 
       const isFriend = checkFriend?.status === FriendStatus.ACCEPTED;
-      console.log(isFriend);
 
       if (isFriend) {
         await this.prisma.$transaction([
