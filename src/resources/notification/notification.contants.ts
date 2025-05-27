@@ -15,6 +15,14 @@ export const NOTIFICATION_MESSAGES = {
     title: 'New Reply',
     message: '{username} replied to your comment',
   },
+  FRIEND_REQUEST: {
+    title: 'New Friend Request',
+    message: '{username} sent you a friend request',
+  },
+  FRIEND_REQUEST_ACCEPT: {
+    title: 'Friend Request Accepted',
+    message: '{username} accepted your friend request',
+  },
 };
 
 export const DEFAULT_NOTIFICATION_PAGE_SIZE = 10;

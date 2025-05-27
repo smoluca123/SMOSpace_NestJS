@@ -35,6 +35,8 @@ import {
   updateUserCoverImageDecorator,
   updateUserInformationDecorator,
   removeFriendDecorator,
+  getMyFriendListDecorator,
+  getFriendByUserIdDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -60,25 +62,6 @@ import { FriendStatus } from '@prisma/client';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Get('/friends')
-  @getFriendListDecorator()
-  async getFriendList(
-    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
-    @Query('page') _page?: string,
-    @Query('limit') _limit?: string,
-  ) {
-    const { userId } = decodedAccessToken;
-    const { limit, page } = normalizePaginationParams({
-      limit: +_limit,
-      page: +_page,
-    });
-    return this.userService.getFriendList({
-      userId,
-      limit,
-      page,
-    });
-  }
-
   @Get('/friends/pending')
   @getPendingFriendsRequestDecorator()
   async getPendingFriendsRequest(
@@ -91,7 +74,58 @@ export class UserController {
       limit: +_limit,
       page: +_page,
     });
+
     return this.userService.getPendingFriendsRequest({
+      userId,
+      limit,
+      page,
+    });
+  }
+
+  @Get('/friends/:userId')
+  @getFriendListDecorator()
+  async getFriendListByUserId(
+    @Param('userId') userId: string,
+    @Query('page') _page?: string,
+    @Query('limit') _limit?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.userService.getFriendList({
+      userId,
+      limit,
+      page,
+    });
+  }
+
+  @Get('/friend/get-friend/:userId/')
+  @getFriendByUserIdDecorator()
+  async getFriendByUserId(
+    @Param('userId') userId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    const { userId: currentUserId } = decodedAccessToken;
+    return this.userService.getFriendByUserId({
+      currentUserId,
+      friendId: userId,
+    });
+  }
+
+  @Get('/friends')
+  @getMyFriendListDecorator()
+  async getMyFriendList(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('page') _page?: string,
+    @Query('limit') _limit?: string,
+  ) {
+    const { userId } = decodedAccessToken;
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.userService.getFriendList({
       userId,
       limit,
       page,
