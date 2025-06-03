@@ -24,7 +24,9 @@ import {
   deletePostDecorator,
   getLikesPostDecorator,
   getMyPostsDecorator,
+  getPostCountDecorator,
   getPostDecorator,
+  getPostsAdminDecorator,
   getPostsDecorator,
   getTrendingTopicsDecorator,
   likePostDecorator,
@@ -48,6 +50,12 @@ import { RoleGuard } from 'src/guards/role.guard';
 @Controller('post')
 export class PostController {
   constructor(private readonly postService: PostService) {}
+
+  @Get('/count')
+  @getPostCountDecorator()
+  getPostCount() {
+    return this.postService.getPostCount();
+  }
 
   @Get('/my-posts')
   @getMyPostsDecorator()
@@ -148,6 +156,26 @@ export class PostController {
       page,
       userId,
       likeUserId,
+    });
+  }
+
+  @Get('/admin/get-post')
+  @getPostsAdminDecorator()
+  getPostsAdmin(
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+    @Query('keywords') keywords?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+
+    return this.postService.getPosts({
+      limit,
+      page,
+      keywords,
+      getPrivatePost: true,
     });
   }
 

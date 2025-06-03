@@ -12,7 +12,7 @@ import { AuthModule } from 'src/resources/auth/auth.module';
 import { JwtModuleCustom } from 'src/jwt/jwt.module';
 import { UserModule } from 'src/resources/user/user.module';
 import { PostModule } from 'src/resources/post/post.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import cacheConfig from 'src/configs/cache.config';
 // import * as redisStore from 'cache-manager-redis-store';
 import { PostCommentModule } from 'src/resources/post-comment/post-comment.module';
@@ -20,6 +20,8 @@ import { RedisModule } from '@liaoliaots/nestjs-redis';
 import { NotificationModule } from 'src/resources/notification/notification.module';
 import { S3Module } from 'src/services/aws/s3/s3.module';
 import { S3Service } from 'src/services/aws/s3/s3.service';
+import { HttpExceptionFilter } from 'src/filters/http-exception.filter';
+import { ResponseInterceptor } from 'src/interceptors/response.interceptor';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -124,6 +126,14 @@ import { S3Service } from 'src/services/aws/s3/s3.service';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseInterceptor,
     },
     // {
     //   provide: APP_GUARD,

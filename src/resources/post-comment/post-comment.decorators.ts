@@ -77,3 +77,11 @@ export const deletePostCommentByAdminDecorator = () =>
       description: 'Delete a specific post comment by admin',
     }),
   );
+
+export const getCommentCountDecorator = () =>
+  applyDecorators(
+    Roles([RolesLevel.MANAGER]),
+    ApiOperation({
+      summary: 'Get comment count',
+    }),
+  );

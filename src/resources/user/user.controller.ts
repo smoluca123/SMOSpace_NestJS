@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   MaxFileSizeValidator,
   Param,
   ParseFilePipe,
@@ -37,6 +38,7 @@ import {
   removeFriendDecorator,
   getMyFriendListDecorator,
   getFriendByUserIdDecorator,
+  getUserCountDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -61,6 +63,12 @@ import { FriendStatus } from '@prisma/client';
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  @Get('/count')
+  @getUserCountDecorator()
+  async getUserCount() {
+    return this.userService.getUserCount();
+  }
 
   @Get('/friends/pending')
   @getPendingFriendsRequestDecorator()
@@ -234,6 +242,7 @@ export class UserController {
   }
 
   @Post('/avatar/:userId')
+  @HttpCode(201)
   @updateUserAvatarDecorator()
   async updateUserAvatar(
     @Param('userId') userId: string,

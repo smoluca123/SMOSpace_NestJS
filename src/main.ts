@@ -4,6 +4,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import configuration from 'src/configs/configuration';
+import { HttpExceptionFilter } from './filters/http-exception.filter';
+import { ResponseInterceptor } from './interceptors/response.interceptor';
 
 const config = configuration();
 
@@ -35,6 +37,9 @@ async function bootstrap() {
 
   // Use Cookie Parser middleware
   app.use(cookieParser());
+
+  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(new ResponseInterceptor());
 
   await app.listen(config.SERVER_PORT, () => {
     console.log(`Server is running on http://localhost:${config.SERVER_PORT}`);

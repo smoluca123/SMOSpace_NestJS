@@ -4,6 +4,26 @@ import { Request } from 'express';
 import { Socket } from 'socket.io';
 import { UserDataType } from 'src/libs/prisma-types';
 
+export interface IBeforeTransformResponseType<T> {
+  type: 'response';
+  message: string;
+  data: T;
+  statusCode?: number;
+  // date: Date;
+}
+
+export interface IBeforeTransformPaginationResponseType<T> {
+  type: 'pagination';
+  message?: string;
+  data: {
+    items: T[];
+    totalCount: number;
+    currentPage: number;
+    pageSize: number;
+  };
+  statusCode?: number;
+}
+
 export interface IResponseType<ResultDataType = null> {
   message: string;
   data: ResultDataType;
