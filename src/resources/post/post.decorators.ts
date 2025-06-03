@@ -38,6 +38,21 @@ export const getPostsDecorator = () =>
     }),
   );
 
+export const getPostsAdminDecorator = () =>
+  applyDecorators(
+    ApiQueryLimitAndPage(),
+    ApiOperation({
+      summary: 'Get posts list (Manager)',
+      description:
+        'Retrieve a paginated list of posts with optional filters for keywords and user interactions',
+    }),
+    ApiQuery({
+      name: 'keywords',
+      required: false,
+    }),
+    Roles([RolesLevel.MANAGER]),
+  );
+
 export const getMyPostsDecorator = () =>
   applyDecorators(
     ApiQueryLimitAndPage(),
@@ -213,4 +228,12 @@ export const deletePostAsAdminDecorator = () =>
       description: 'Delete any post with administrator-level access privileges',
     }),
     Roles([RolesLevel.ADMIN]),
+  );
+
+export const getPostCountDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get post count',
+      description: 'Get the total number of posts',
+    }),
   );

@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { handleDefaultError } from 'src/global/functions.global';
 import {
+  IBeforeTransformResponseType,
   IPaginationResponseType,
   IResponseType,
 } from 'src/interfaces/interfaces.global';
@@ -129,6 +130,25 @@ export class PostCommentService {
   //     handleDefaultError(error);
   //   }
   // }
+
+  async getCommentCount(): Promise<
+    IBeforeTransformResponseType<{
+      totalCommentsCount: number;
+    }>
+  > {
+    try {
+      const count = await this.prisma.postComment.count();
+      return {
+        type: 'response',
+        message: 'Comment count fetched successfully',
+        data: {
+          totalCommentsCount: count,
+        },
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
 
   async createPostComment({
     authorId,
@@ -364,7 +384,7 @@ export class PostCommentService {
     return {
       message: 'Comment updated successfully',
       data: updatedComment,
-      statusCode: 200,
+      statusCode: 201,
       date: new Date(),
     };
   }
@@ -383,7 +403,7 @@ export class PostCommentService {
     return {
       message: 'Comment updated successfully',
       data: updatedComment,
-      statusCode: 200,
+      statusCode: 201,
       date: new Date(),
     };
   }

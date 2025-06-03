@@ -391,3 +391,11 @@ export const removeFriendDecorator = () =>
     }),
     UseGuards(JwtTokenVerifyGuard),
   );
+
+export const getUserCountDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get user count',
+      description: 'Get user count',
+    }),
+  );

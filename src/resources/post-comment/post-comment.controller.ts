@@ -21,6 +21,7 @@ import {
   createPostCommentDecorator,
   deletePostCommentByAdminDecorator,
   deletePostCommentDecorator,
+  getCommentCountDecorator,
   getPostCommentDecorator,
   updatePostCommentByAdminDecorator,
   updatePostCommentDecorator,
@@ -35,6 +36,12 @@ import { normalizePaginationParams } from 'src/utils/utils';
 @Controller('/post/comment')
 export class PostCommentController {
   constructor(private readonly postCommentService: PostCommentService) {}
+
+  @Get('/count')
+  @getCommentCountDecorator()
+  getCommentCount() {
+    return this.postCommentService.getCommentCount();
+  }
 
   @Post('/:postId')
   @createPostCommentDecorator()

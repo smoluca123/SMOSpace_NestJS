@@ -10,6 +10,7 @@ import {
   processDataObject,
 } from 'src/global/functions.global';
 import {
+  IBeforeTransformPaginationResponseType,
   IDecodedAccecssTokenType,
   IPaginationResponseType,
   IResponseType,
@@ -84,6 +85,42 @@ export class UserService {
     }
   }
 
+  async getUserCount() {
+    try {
+      const totalUser = await this.prisma.user.count();
+      const totalUserActive = await this.prisma.user.count({
+        where: {
+          isActive: true,
+        },
+      });
+      const totalUserBanned = await this.prisma.user.count({
+        where: {
+          isBanned: true,
+        },
+      });
+      const totalAdmin = await this.prisma.user.count({
+        where: {
+          userType: {
+            typeName: 'Administrator',
+          },
+        },
+      });
+
+      return {
+        type: 'response',
+        message: 'Get user count successfully',
+        data: {
+          totalUser,
+          totalUserActive,
+          totalUserBanned,
+          totalAdmin,
+        },
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   async getAllUsers({
     keywords = '',
     limit = 10,
@@ -95,11 +132,8 @@ export class UserService {
     page?: number;
     currentUserId?: string;
   }): Promise<
-    IPaginationResponseType<
-      | UserDataType
-      | (UserDataWithIsFollowedType & {
-          friend: FriendDataType;
-        })
+    IBeforeTransformPaginationResponseType<
+      UserDataType | (UserDataWithIsFollowedType & { friend: FriendDataType })
     >
   > {
     try {
@@ -145,9 +179,9 @@ export class UserService {
       ]);
 
       // Calculate pagination metadata
-      const totalPage = Math.ceil(totalCount / limit);
-      const hasNextPage = page < totalPage;
-      const hasPreviousPage = !!totalCount && page > 1;
+      // const totalPage = Math.ceil(totalCount / limit);
+      // const hasNextPage = page < totalPage;
+      // const hasPreviousPage = !!totalCount && page > 1;
 
       const result = users.map(({ followers, friends, ...user }) => ({
         ...user,
@@ -156,19 +190,30 @@ export class UserService {
       }));
 
       // Return formatted response
+      // return {
+      //   message: 'Get all users successfully',
+      //   data: {
+      //     currentPage: page,
+      //     totalCount,
+      //     totalPage,
+      //     pageSize: limit,
+      //     hasNextPage,
+      //     hasPreviousPage,
+      //     items: result,
+      //   },
+      //   statusCode: 200,
+      //   date: new Date(),
+      // };
       return {
+        type: 'pagination',
         message: 'Get all users successfully',
         data: {
           currentPage: page,
           totalCount,
-          totalPage,
           pageSize: limit,
-          hasNextPage,
-          hasPreviousPage,
           items: result,
         },
         statusCode: 200,
-        date: new Date(),
       };
     } catch (error) {
       handleDefaultError(error);
@@ -351,7 +396,7 @@ export class UserService {
       return {
         message: 'Update information successfully',
         data: user,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -431,7 +476,7 @@ export class UserService {
       return {
         message: 'Update user information successfully',
         data: user,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -486,7 +531,7 @@ export class UserService {
       return {
         message: 'Update user avatar successfully',
         data: updatedUser,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -526,7 +571,7 @@ export class UserService {
       return {
         message: 'Update user cover image successfully',
         data: updatedUser,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -570,7 +615,7 @@ export class UserService {
       return {
         message: 'Update user credits successfully',
         data: updatedUser,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -619,7 +664,7 @@ export class UserService {
       return {
         message: 'Add user credits successfully',
         data: updatedUser,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -705,7 +750,7 @@ export class UserService {
       return {
         message: 'Verification email sent successfully',
         data: null,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -813,7 +858,7 @@ export class UserService {
       return {
         message: 'Forgot password email sent successfully',
         data: null,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -872,7 +917,7 @@ export class UserService {
       return {
         message: 'User activated successfully',
         data: updatedUser,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -918,7 +963,7 @@ export class UserService {
       return {
         message: 'Password reset successfully',
         data: updatedUser,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -1017,7 +1062,7 @@ export class UserService {
             isFollowedByUser: !existingFollow,
           },
         },
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -1758,7 +1803,7 @@ export class UserService {
         return {
           message: 'Friendship request removed successfully',
           data: checkFriendshipRequest,
-          statusCode: 200,
+          statusCode: 201,
           date: new Date(),
         };
       }
@@ -1787,7 +1832,7 @@ export class UserService {
         return {
           message: 'Friendship request accepted successfully',
           data: updatedRequest,
-          statusCode: 200,
+          statusCode: 201,
           date: new Date(),
         };
       }
@@ -1900,7 +1945,7 @@ export class UserService {
         data: {
           ...acceptedFriendshipRequest,
         },
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -1949,7 +1994,7 @@ export class UserService {
       return {
         message: 'Friendship request rejected successfully',
         data: rejectedFriendshipRequest,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -2020,7 +2065,7 @@ export class UserService {
       return {
         message: 'Friend removed successfully',
         data: removedFriend,
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {
@@ -2068,7 +2113,7 @@ export class UserService {
           data: {
             ...blockedFriend,
           },
-          statusCode: 200,
+          statusCode: 201,
           date: new Date(),
         };
       }
@@ -2115,7 +2160,7 @@ export class UserService {
         data: {
           ...newBlockedFriend,
         },
-        statusCode: 200,
+        statusCode: 201,
         date: new Date(),
       };
     } catch (error) {

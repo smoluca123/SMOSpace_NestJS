@@ -13,6 +13,7 @@ import {
 import { handleDefaultError } from 'src/global/functions.global';
 import {
   IBaseResponseAIType,
+  IBeforeTransformResponseType,
   IDecodedAccecssTokenType,
   IPaginationResponseType,
   IResponseType,
@@ -63,6 +64,35 @@ export class PostService {
         throw new NotFoundException('Post not found');
       }
       return post as DataType;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getPostCount(): Promise<
+    IBeforeTransformResponseType<{
+      totalPostsCount: number;
+      publicPostsCount: number;
+      privatePostsCount: number;
+    }>
+  > {
+    try {
+      const count = await this.prisma.post.count();
+      const countPrivate = await this.prisma.post.count({
+        where: {
+          isPrivate: true,
+        },
+      });
+
+      return {
+        type: 'response',
+        message: 'Post count fetched successfully',
+        data: {
+          totalPostsCount: count,
+          publicPostsCount: count - countPrivate,
+          privatePostsCount: countPrivate,
+        },
+      };
     } catch (error) {
       handleDefaultError(error);
     }
