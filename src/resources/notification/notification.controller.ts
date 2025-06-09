@@ -1,14 +1,24 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+  Body,
+} from '@nestjs/common';
 import { NotificationService } from './notification.service';
 import { normalizePaginationParams } from 'src/utils/utils';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import {
+  changeNotificationStatusDecorator,
   getNotificationsDecorator,
   getUserNotificationsDecorator,
 } from 'src/resources/notification/notification.decorators';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
+import { ChangeNotificationStatusDto } from 'src/resources/notification/notification.dto';
 
 @ApiTags('Notification Management')
 @ApiBearerAuth()
@@ -52,6 +62,18 @@ export class NotificationController {
       userId: decodedAccessToken.userId,
       page,
       limit,
+    });
+  }
+
+  @Patch('/status/:notificationId')
+  @changeNotificationStatusDecorator()
+  async changeNotificationStatus(
+    @Param('notificationId') notificationId: string,
+    @Body() data: ChangeNotificationStatusDto,
+  ) {
+    return this.notificationService.changeNotificationStatus({
+      notificationId,
+      isRead: data.isRead,
     });
   }
 }

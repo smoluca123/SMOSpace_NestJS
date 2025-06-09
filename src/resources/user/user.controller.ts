@@ -8,8 +8,8 @@ import {
   MaxFileSizeValidator,
   Param,
   ParseFilePipe,
+  Patch,
   Post,
-  Put,
   Query,
   UploadedFile,
   UseGuards,
@@ -39,6 +39,7 @@ import {
   getMyFriendListDecorator,
   getFriendByUserIdDecorator,
   getUserCountDecorator,
+  unFollowUserDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -351,6 +352,18 @@ export class UserController {
     });
   }
 
+  @Post('/unfollow/:userId')
+  @unFollowUserDecorator()
+  unFollowUser(
+    @Param('userId') userId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    return this.userService.unfollowUser({
+      userId,
+      followerUserId: decodedAccessToken.userId,
+    });
+  }
+
   @Post('/friend/:userId')
   @toggleFriendshipRequestDecorator()
   toggleFriendshipRequest(
@@ -398,7 +411,7 @@ export class UserController {
     });
   }
 
-  @Put('/ban/:userId')
+  @Patch('/ban/:userId')
   @banUserDecorator()
   async banUser(
     @Param('userId') userId: string,
@@ -409,7 +422,7 @@ export class UserController {
     return result;
   }
 
-  @Put('/credits/update/:userId')
+  @Patch('/credits/update/:userId')
   @ApiOperation({
     summary: 'Update user credits',
     description: 'Update the credits of a specific user',
@@ -424,7 +437,7 @@ export class UserController {
     });
   }
 
-  @Put('/me')
+  @Patch('/me')
   @updateInformationDecorator()
   async updateInfomation(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
@@ -434,7 +447,7 @@ export class UserController {
     return this.userService.updateUserInformation(userId, updateProfileDto);
   }
 
-  @Put('/:userId')
+  @Patch('/:userId')
   @updateUserInformationDecorator()
   async updateUserInfomation(
     @Param('userId') userId: string,
