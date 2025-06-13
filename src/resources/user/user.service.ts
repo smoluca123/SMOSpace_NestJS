@@ -29,6 +29,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   BanUserDto,
+  BanUsersDto,
   UpdateProfileDto,
   UserActiveByCodeDto,
   UserResetPasswordDto,
@@ -354,6 +355,53 @@ export class UserService {
         data: null,
         statusCode: 200,
         date: new Date(),
+      };
+    } catch (error) {
+      // Handle any errors that occur during the process
+      handleDefaultError(error);
+    }
+  }
+
+  async banUsers(data: BanUsersDto): Promise<
+    IBeforeTransformResponseType<
+      {
+        userId: string;
+        isBanned: boolean;
+      }[]
+    >
+  > {
+    try {
+      // Check if the userId is provided
+      if (data.banList.length === 0)
+        return {
+          type: 'response',
+          message: 'Ban users successfully',
+          data: [],
+          statusCode: 200,
+        };
+
+      const userBanList = data.banList.filter((item) => item.isBanned === true);
+      const userUnbanList = data.banList.filter(
+        (item) => item.isBanned === false,
+      );
+
+      // Update the user's ban status
+      await this.prisma.user.updateMany({
+        where: { id: { in: userBanList.map((item) => item.userId) } },
+        data: { isBanned: true },
+      });
+
+      await this.prisma.user.updateMany({
+        where: { id: { in: userUnbanList.map((item) => item.userId) } },
+        data: { isBanned: false },
+      });
+
+      // Construct the response message based on the ban status
+      return {
+        type: 'response',
+        message: `Update user ban status successfully`,
+        data: data.banList,
+        statusCode: 200,
       };
     } catch (error) {
       // Handle any errors that occur during the process

@@ -39,12 +39,13 @@ import {
   getMyFriendListDecorator,
   getFriendByUserIdDecorator,
   getUserCountDecorator,
-  unFollowUserDecorator,
+  banUsersDecorator
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
 import {
   BanUserDto,
+  BanUsersDto,
   ChangeFriendshipStatusDto,
   UpdateProfileDto,
   UpdateUserDto,
@@ -411,7 +412,15 @@ export class UserController {
     });
   }
 
-  @Patch('/ban/:userId')
+  @Put('/ban/users')
+  @banUsersDecorator()
+  async banUsers(@Body() banUserData: BanUsersDto) {
+    const result = await this.userService.banUsers(banUserData);
+
+    return result;
+  }
+
+  @Put('/ban/:userId')
   @banUserDecorator()
   async banUser(
     @Param('userId') userId: string,

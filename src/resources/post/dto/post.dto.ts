@@ -8,6 +8,7 @@ import {
   IsUUID,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { UUID } from 'crypto';
 
 export class CreatePostDto {
   @ApiProperty({ default: '', required: true })
@@ -51,4 +52,12 @@ export class UpdatePostAsAdminDto extends UpdatePostDto {
   @ApiProperty({ default: '' })
   @IsUUID()
   authorId: string;
+}
+
+export class DeletePostsDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsArray()
+  @IsUUID(4, { each: true })
+  postIds: UUID[];
 }
