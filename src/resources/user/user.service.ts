@@ -1030,9 +1030,11 @@ export class UserService {
   async followUser({
     followerUserId,
     userId,
+    skipNotification = false,
   }: {
     followerUserId: string;
     userId: string;
+    skipNotification?: boolean;
   }): Promise<
     IResponseType<FollowDataType & { following: UserDataWithIsFollowedType }>
   > {
@@ -1063,6 +1065,13 @@ export class UserService {
           id: true,
         },
       });
+      if (existingFollow)
+        return {
+          message: 'User already followed',
+          data: null,
+          statusCode: 200,
+          date: new Date(),
+        };
 
       // Execute multiple database operations in a transaction
       const [, , followResult] = await this.prisma.$transaction([
@@ -1095,15 +1104,17 @@ export class UserService {
       ]);
 
       // Send notification to the target user
-      await this.notificationService.createFollowNotification({
-        recipientId: userId,
-        senderId: followerUserId,
-        senderData: followResult.follower,
-      });
+      if (!skipNotification) {
+        await this.notificationService.createFollowNotification({
+          recipientId: userId,
+          senderId: followerUserId,
+          senderData: followResult.follower,
+        });
+      }
 
       // Return success response with updated follow data
       return {
-        message: `${existingFollow ? 'Unfollow' : 'Follow'} user successfully`,
+        message: `'Follow' user successfully`,
         data: {
           ...followResult,
           following: {
@@ -1113,6 +1124,101 @@ export class UserService {
         },
         statusCode: 201,
         date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async unfollowUser({
+    followerUserId,
+    userId,
+  }: {
+    followerUserId: string;
+    userId: string;
+  }): Promise<
+    IBeforeTransformResponseType<
+      FollowDataType & { following: UserDataWithIsFollowedType }
+    >
+  > {
+    try {
+      // Validate that both user IDs are provided
+      if (!userId || !followerUserId) {
+        throw new BadRequestException('Missing required user IDs');
+      }
+
+      // Prevent users from following themselves
+      if (userId === followerUserId) {
+        throw new ForbiddenException('Cannot follow yourself');
+      }
+
+      // Check if the target user exists in database
+      const targetUser = await this.validateUser({
+        userId,
+        selectData: { id: true },
+      });
+      if (!targetUser) throw new NotFoundException('Target user not found');
+
+      // Check if a follow relationship already exists between the users
+      const existingFollow = await this.prisma.follow.findFirst({
+        where: {
+          followerId: followerUserId,
+          followingId: userId,
+        },
+        select: {
+          id: true,
+        },
+      });
+      if (!existingFollow)
+        return {
+          type: 'response',
+          message: 'User is not followed',
+          data: null,
+          statusCode: 200,
+        };
+
+      // Execute multiple database operations in a transaction
+      const [, , followResult] = await this.prisma.$transaction([
+        // Update the follower count of the target user
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            followerCount: { [existingFollow ? 'decrement' : 'increment']: 1 },
+          },
+          select: userDataSelect,
+        }),
+        // Update the following count of the follower
+        this.prisma.user.update({
+          where: { id: followerUserId },
+          data: {
+            followingCount: { [existingFollow ? 'decrement' : 'increment']: 1 },
+          },
+          select: userDataSelect,
+        }),
+        // Either delete or create the follow relationship
+        this.prisma.follow.delete({
+          where: { id: existingFollow.id },
+          select: followDataSelect,
+        }),
+      ]);
+
+      await this.notificationService.deleteFollowNotification({
+        recipientId: userId,
+        senderId: followerUserId,
+      });
+
+      // Return success response with updated follow data
+      return {
+        type: 'response',
+        message: `'Unfollow' user successfully`,
+        data: {
+          ...followResult,
+          following: {
+            ...followResult.following,
+            isFollowedByUser: false,
+          },
+        },
+        statusCode: 201,
       };
     } catch (error) {
       handleDefaultError(error);
@@ -1859,6 +1965,12 @@ export class UserService {
 
       // Accept friendship request
       if (checkFriendshipRequestReceived) {
+        // Follow user
+        await this.followUser({
+          followerUserId: currentUserId,
+          userId: user.id,
+          skipNotification: true,
+        });
         const updatedRequest = await this.prisma.friend.update({
           where: {
             id: checkFriendshipRequestReceived.id,
@@ -1885,6 +1997,13 @@ export class UserService {
           date: new Date(),
         };
       }
+
+      // Follow user
+      await this.followUser({
+        followerUserId: currentUser.id,
+        userId: user.id,
+        skipNotification: true,
+      });
 
       // Create new friendship request
       const newFriendshipRequest = await this.prisma.friend.create({
@@ -1963,6 +2082,13 @@ export class UserService {
         throw new BadRequestException('You blocked this user');
       }
 
+      // Follow user
+      await this.followUser({
+        followerUserId: currentUserId,
+        userId,
+        skipNotification: true,
+      });
+
       const [, , acceptedFriendshipRequest] = await this.prisma.$transaction([
         this.prisma.user.update({
           where: { id: user.id },
@@ -1985,8 +2111,8 @@ export class UserService {
 
       // Delete friend request notifications
       await this.notificationService.deleteFriendRequestNotifications({
-        userId: currentUserId,
-        friendId: userId,
+        userId: userId,
+        friendId: currentUserId,
       });
 
       return {
@@ -2082,6 +2208,19 @@ export class UserService {
       if (!checkFriend) {
         throw new BadRequestException('Friend not found');
       }
+
+      // Follow user
+      const unfollowPromises = [
+        await this.unfollowUser({
+          followerUserId: currentUserId,
+          userId: user.id,
+        }),
+        await this.unfollowUser({
+          followerUserId: user.id,
+          userId: currentUserId,
+        }),
+      ];
+      await Promise.all(unfollowPromises);
 
       const [, removedFriend] = await this.prisma.$transaction([
         this.prisma.user.updateMany({
