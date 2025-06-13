@@ -14,6 +14,7 @@ import { PostService } from './post.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CreatePostDto,
+  DeletePostsDto,
   UpdatePostAsAdminDto,
   UpdatePostDto,
 } from 'src/resources/post/dto/post.dto';
@@ -22,6 +23,7 @@ import {
   createPostDecorator,
   deletePostAsAdminDecorator,
   deletePostDecorator,
+  deletePostsDecorator,
   getLikesPostDecorator,
   getMyPostsDecorator,
   getPostCountDecorator,
@@ -240,6 +242,13 @@ export class PostController {
       data,
       decodedAccessToken,
     });
+  }
+
+  @Delete('admin/delete-posts')
+  @deletePostsDecorator()
+  deletePosts(@Body() data: DeletePostsDto) {
+    const { postIds } = data;
+    return this.postService.handleDeletePosts(postIds);
   }
 
   @Delete('admin/:postId')

@@ -11,7 +11,9 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
 } from 'class-validator';
+import { UUID } from 'crypto';
 
 export class UserAdditionalInfoDto {
   @ApiPropertyOptional({ default: '' })
@@ -153,4 +155,31 @@ export class ChangeFriendshipStatusDto {
   @IsIn([FriendStatus.REJECTED, FriendStatus.ACCEPTED])
   @IsNotEmpty()
   status: AllowedFriendStatus;
+}
+
+export class BanUsersDto {
+  @ApiProperty({
+    default: [
+      {
+        userId: '123e4567-e89b-12d3-a456-426614174000',
+        isBanned: true,
+      },
+    ],
+  })
+  @IsArray()
+  @IsNotEmpty()
+  @Type(() => BanUserItemDto)
+  banList: BanUserItemDto[];
+}
+
+export class BanUserItemDto {
+  @ApiProperty()
+  @IsUUID()
+  @IsNotEmpty()
+  userId: UUID;
+
+  @ApiProperty()
+  @IsBoolean()
+  @IsNotEmpty()
+  isBanned: boolean;
 }

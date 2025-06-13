@@ -37,6 +37,7 @@ import {
 } from 'src/resources/post/dto/post.dto';
 import { S3Service } from 'src/services/aws/s3/s3.service';
 import { NotificationService } from 'src/resources/notification/notification.service';
+import { UUID } from 'crypto';
 
 @Injectable()
 export class PostService {
@@ -798,6 +799,62 @@ export class PostService {
       data: deletedPost,
       statusCode: 200,
       date: new Date(),
+    };
+  }
+
+  async handleDeletePosts(postIds: UUID[]): Promise<
+    IBeforeTransformResponseType<
+      {
+        postId: string;
+      }[]
+    >
+  > {
+    const posts = await this.prisma.post.findMany({
+      where: { id: { in: postIds } },
+      select: { authorId: true },
+    });
+
+    if (posts.length === 0) {
+      return {
+        type: 'response',
+        message: 'Delete posts successfully',
+        data: [],
+      };
+    }
+
+    // Delete post images
+    postIds.map((postId) => this.s3Service.deletePostImages({ postId }));
+
+    // Delete all notifications related to this post
+    const deleteNotificationsPromises = postIds.map((postId) =>
+      this.notificationService.deletePostRelatedNotifications(postId),
+    );
+    await Promise.all(deleteNotificationsPromises);
+
+    // Delete post and decrement user's post count in a transaction
+    const [] = await this.prisma.$transaction([
+      this.prisma.user.updateMany({
+        where: {
+          id: {
+            in: posts.map((post) => post.authorId),
+          },
+        },
+        data: { postCount: { decrement: 1 } },
+      }),
+      this.prisma.post.deleteMany({
+        where: { id: { in: postIds } },
+      }),
+    ]);
+
+    const result = postIds.map((postId) => ({
+      postId,
+    }));
+
+    return {
+      type: 'response',
+      message: 'Post deleted successfully',
+      data: result,
+      statusCode: 200,
     };
   }
 

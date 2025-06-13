@@ -16,6 +16,7 @@ import { FileUploadInterceptor } from 'src/interceptors/file-upload.interceptor'
 import { RolesLevel } from 'src/interfaces/interfaces.global';
 
 import {
+  BanUsersDto,
   ChangeFriendshipStatusDto,
   UserAvatarUpdateDto,
   UserCoverImageUpdateDto,
@@ -84,6 +85,20 @@ export const banUserDecorator = () =>
       summary: 'Ban/unban user',
       description:
         'Toggle ban status for a specific user (Admin access required)',
+    }),
+  );
+
+export const banUsersDecorator = () =>
+  applyDecorators(
+    Roles([RolesLevel.ADMIN]),
+    ApiOperation({
+      summary: 'Ban/unban users',
+      description:
+        'Toggle ban status for multiple users (Admin access required)',
+    }),
+    ApiBody({
+      type: BanUsersDto,
+      description: 'List of users to ban/unban',
     }),
   );
 

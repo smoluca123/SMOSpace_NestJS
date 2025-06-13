@@ -221,6 +221,16 @@ export const deletePostDecorator = () =>
     }),
   );
 
+export const deletePostsDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Delete posts',
+      description:
+        'Delete multiple posts. Requires authentication and post ownership.',
+    }),
+    Roles([RolesLevel.ADMIN]),
+  );
+
 export const deletePostAsAdminDecorator = () =>
   applyDecorators(
     ApiOperation({
