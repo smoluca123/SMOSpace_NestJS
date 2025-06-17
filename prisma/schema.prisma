@@ -92,6 +92,8 @@ model User {
   media                Media[]
   friends              Friend[]
   friendOf             Friend[]            @relation("UserFriend")
+  ChatParticipant      ChatParticipant[]
+  ChatMessage          ChatMessage[]
 
   @@index([username, email, type])
   @@map("users")
@@ -414,4 +416,78 @@ model Media {
 enum MediaType {
   IMAGE
   VIDEO
+}
+
+model ChatRoom {
+  id        String         @id @default(uuid())
+  name      String?
+  type      ChatType       @default(DIRECT)
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  status    ChatRoomStatus @default(PENDING) @map("status")
+
+  // Participants in the chat room
+  participants ChatParticipant[]
+  messages     ChatMessage[]
+
+  @@map("chat_rooms")
+}
+
+model ChatParticipant {
+  id       String    @id @default(uuid())
+  userId   String    @map("user_id")
+  roomId   String    @map("room_id")
+  role     ChatRole  @default(MEMBER)
+  joinedAt DateTime  @default(now()) @map("joined_at")
+  leftAt   DateTime? @map("left_at")
+
+  user User     @relation(fields: [userId], references: [id])
+  room ChatRoom @relation(fields: [roomId], references: [id])
+
+  @@unique([userId, roomId])
+  @@map("chat_participants")
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  roomId    String      @map("room_id")
+  senderId  String      @map("sender_id")
+  content   String
+  type      MessageType @default(TEXT)
+  replyToId String?     @map("reply_to_id")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  readBy    String[]    @map("read_by")
+
+  room    ChatRoom      @relation(fields: [roomId], references: [id])
+  sender  User          @relation(fields: [senderId], references: [id])
+  replyTo ChatMessage?  @relation("MessageReply", fields: [replyToId], references: [id])
+  replies ChatMessage[] @relation("MessageReply")
+
+  @@index([roomId, createdAt])
+  @@map("chat_messages")
+}
+
+enum ChatType {
+  DIRECT
+  GROUP
+}
+
+enum ChatRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+enum ChatRoomStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

@@ -2,10 +2,27 @@ import * as crypto from 'crypto';
 
 import * as bcrypt from 'bcryptjs';
 
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import {
+  PrismaClientInitializationError,
+  PrismaClientKnownRequestError,
+  PrismaClientUnknownRequestError,
+} from '@prisma/client/runtime/library';
 
 export const handleDefaultError = (error: any) => {
   console.log(error);
+  if (
+    error instanceof PrismaClientKnownRequestError ||
+    error instanceof PrismaClientUnknownRequestError ||
+    error instanceof PrismaClientInitializationError
+  ) {
+    throw new InternalServerErrorException(
+      '500: Internal server error, please try again later',
+    );
+  }
   if ((error.statusCode && error.message) || error.response) throw error;
   // if (error.message) throw new BadRequestException(error.message);
   throw new BadRequestException(error.message || 'Unknown error!');
