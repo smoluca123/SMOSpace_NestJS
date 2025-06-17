@@ -4,8 +4,8 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
-  Put,
   Query,
   UploadedFiles,
   UseGuards,
@@ -218,7 +218,7 @@ export class PostController {
     });
   }
 
-  @Put('admin/:postId')
+  @Patch('admin/:postId')
   @updatePostAsAdminDecorator()
   updatePostAsAdmin(
     @Param('postId') postId: string,
@@ -230,7 +230,7 @@ export class PostController {
     });
   }
 
-  @Put(':postId')
+  @Patch(':postId')
   @updatePostDecorator()
   updatePost(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,

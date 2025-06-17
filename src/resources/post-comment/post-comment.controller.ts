@@ -4,8 +4,8 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
-  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -79,7 +79,7 @@ export class PostCommentController {
     });
   }
 
-  @Put('/:commentId')
+  @Patch('/:commentId')
   @updatePostCommentDecorator()
   updatePostComment(
     @Param('commentId') commentId: string,
@@ -94,7 +94,7 @@ export class PostCommentController {
     });
   }
 
-  @Put('/admin/:commentId')
+  @Patch('/admin/:commentId')
   @updatePostCommentByAdminDecorator()
   updatePostCommentByAdmin(
     @Param('commentId') commentId: string,

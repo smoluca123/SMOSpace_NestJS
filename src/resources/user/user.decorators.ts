@@ -197,8 +197,8 @@ export const updateUserCoverImageDecorator = () =>
 export const followUserDecorator = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Follow/unfollow user',
-      description: 'Toggle follow status for a specific user',
+      summary: 'Follow user',
+      description: 'Follow a specific user',
     }),
     ApiHeader({
       name: 'accessToken',
@@ -207,7 +207,25 @@ export const followUserDecorator = () =>
     }),
     ApiParam({
       name: 'userId',
-      description: 'ID of the user to follow/unfollow',
+      description: 'ID of the user to follow',
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+  );
+
+export const unFollowUserDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Unfollow user',
+      description: 'Unfollow a specific user',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+      description: 'JWT access token for authentication',
+    }),
+    ApiParam({
+      name: 'userId',
+      description: 'ID of the user to unfollow',
     }),
     UseGuards(JwtTokenVerifyGuard),
   );

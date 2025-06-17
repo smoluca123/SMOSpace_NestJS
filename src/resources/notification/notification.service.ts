@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { EntityType, NotificationPriority, Prisma } from '@prisma/client';
 import { handleDefaultError } from 'src/global/functions.global';
 import {
+  IBeforeTransformResponseType,
   IPaginationResponseType,
   IResponseType,
 } from 'src/interfaces/interfaces.global';
@@ -208,6 +209,23 @@ export class NotificationService {
 
     this.notificationGateway.emitNewNotification(newNotification);
     return newNotification;
+  }
+
+  async deleteFollowNotification(payload: {
+    recipientId: string;
+    senderId: string;
+  }) {
+    try {
+      await this.prisma.notification.deleteMany({
+        where: {
+          recipientId: payload.recipientId,
+          senderId: payload.senderId,
+          type: { type: 'FOLLOW_USER' },
+        },
+      });
+    } catch (error) {
+      handleDefaultError(error);
+    }
   }
 
   async createCommentNotification(payload: INotificationCommentPayload) {
@@ -514,6 +532,29 @@ export class NotificationService {
         data: null,
         statusCode: 204,
         date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async changeNotificationStatus({
+    notificationId,
+    isRead,
+  }: {
+    notificationId: string;
+    isRead: boolean;
+  }): Promise<IBeforeTransformResponseType<NotificationDataType>> {
+    try {
+      const notification = await this.prisma.notification.update({
+        where: { id: notificationId },
+        data: { isRead, readAt: isRead ? new Date() : null },
+        select: notificationDataSelect,
+      });
+      return {
+        type: 'response',
+        message: 'Notification status changed successfully',
+        data: notification,
       };
     } catch (error) {
       handleDefaultError(error);
