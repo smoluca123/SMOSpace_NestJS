@@ -22,6 +22,7 @@ import { S3Module } from 'src/services/aws/s3/s3.module';
 import { S3Service } from 'src/services/aws/s3/s3.service';
 import { HttpExceptionFilter } from 'src/filters/http-exception.filter';
 import { ResponseInterceptor } from 'src/interceptors/response.interceptor';
+import { ChatModule } from 'src/resources/chat/chat.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -117,6 +118,7 @@ import { ResponseInterceptor } from 'src/interceptors/response.interceptor';
     // AppGatewayModule,
     NotificationModule,
     S3Module,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [

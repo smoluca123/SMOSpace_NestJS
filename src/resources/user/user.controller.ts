@@ -39,7 +39,8 @@ import {
   getMyFriendListDecorator,
   getFriendByUserIdDecorator,
   getUserCountDecorator,
-  banUsersDecorator
+  banUsersDecorator,
+  unFollowUserDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -412,15 +413,7 @@ export class UserController {
     });
   }
 
-  @Put('/ban/users')
-  @banUsersDecorator()
-  async banUsers(@Body() banUserData: BanUsersDto) {
-    const result = await this.userService.banUsers(banUserData);
-
-    return result;
-  }
-
-  @Put('/ban/:userId')
+  @Patch('/ban/:userId')
   @banUserDecorator()
   async banUser(
     @Param('userId') userId: string,
@@ -463,6 +456,14 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.userService.updateUserInformation(userId, updateUserDto);
+  }
+
+  @Patch('/ban/users')
+  @banUsersDecorator()
+  async banUsers(@Body() banUserData: BanUsersDto) {
+    const result = await this.userService.banUsers(banUserData);
+
+    return result;
   }
 
   @Delete('/friend/:userId')

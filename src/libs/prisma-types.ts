@@ -262,3 +262,64 @@ export type FriendDataWithUserAndFriend = Prisma.FriendGetPayload<{
   select: typeof friendDataSelect;
   include: typeof friendDataInclude;
 }>;
+
+export const chatParticipantDataSelect = {
+  id: true,
+  leftAt: true,
+  joinedAt: true,
+  user: {
+    select: {
+      id: true,
+      username: true,
+      displayName: true,
+      avatar: true,
+    },
+  },
+} satisfies Prisma.ChatParticipantSelect;
+
+export type ChatParticipantDataType = Prisma.ChatParticipantGetPayload<{
+  select: typeof chatParticipantDataSelect;
+}>;
+
+export const chatRoomDataSelect = {
+  id: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  type: true,
+  name: true,
+  participants: {
+    select: chatParticipantDataSelect,
+  },
+} satisfies Prisma.ChatRoomSelect;
+
+export type ChatRoomDataType = Prisma.ChatRoomGetPayload<{
+  select: typeof chatRoomDataSelect;
+}>;
+
+export const chatMessageDataSelect = {
+  id: true,
+  content: true,
+  createdAt: true,
+  updatedAt: true,
+  sender: {
+    select: userDataSelect,
+  },
+  readBy: true,
+  replyTo: {
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  type: true,
+  room: {
+    select: chatRoomDataSelect,
+  },
+} satisfies Prisma.ChatMessageSelect;
+
+export type ChatMessageDataType = Prisma.ChatMessageGetPayload<{
+  select: typeof chatMessageDataSelect;
+}>;
