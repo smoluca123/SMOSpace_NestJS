@@ -8,7 +8,7 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, UsePipes } from '@nestjs/common';
 import { WsJwtAuthGuard } from '../../guards/ws-jwt-auth.guard';
 import { ChatService } from './chat.service';
 import { CreateMessageDto } from './dto/create-message.dto';
@@ -16,6 +16,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { WsJwtGuard } from 'src/guards/ws-auth.guard';
 import { SocketWithUserAndDecodedAccessToken } from 'src/interfaces/interfaces.global';
 import { WsJwtVerifyGuard } from 'src/guards/ws-jwt-verify.guard';
+import {
+  JoinRoomSchema,
+  joinRoomSchema,
+  LeaveRoomSchema,
+  leaveRoomSchema,
+  sendMessageSchema,
+} from 'src/resources/chat/schemas/chat.schemas';
+import { ZodValidationPipe } from 'src/pipes/zod.pipe';
 
 @UseGuards(WsJwtGuard)
 @WebSocketGateway({
@@ -48,10 +56,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @UseGuards(WsJwtVerifyGuard)
+  @UsePipes(new ZodValidationPipe(joinRoomSchema))
   @SubscribeMessage('joinRoom')
   async handleJoinRoom(
     @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
-    @MessageBody() data: { roomId: string },
+    @MessageBody() data: JoinRoomSchema,
   ) {
     const userId = client.data.user.id;
     const { roomId } = data;
@@ -67,18 +76,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @UseGuards(WsJwtAuthGuard)
+  @UsePipes(new ZodValidationPipe(leaveRoomSchema))
   @SubscribeMessage('leaveRoom')
   async handleLeaveRoom(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() roomId: string,
+    @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
+    @MessageBody() data: LeaveRoomSchema,
   ) {
+    const { roomId } = data;
     client.leave(`room:${roomId}`);
     // Remove from typing users
-    this.removeTypingUser(roomId, client.handshake.auth.userId);
+    this.removeTypingUser(roomId, client.data.user.id);
     return { success: true };
   }
 
   @UseGuards(WsJwtVerifyGuard)
+  @UsePipes(new ZodValidationPipe(sendMessageSchema))
   @SubscribeMessage('sendMessage')
   async handleMessage(
     @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
@@ -181,13 +193,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  @UseGuards(WsJwtAuthGuard)
+  @UseGuards(WsJwtVerifyGuard)
   @SubscribeMessage('markAsRead')
   async handleMarkAsRead(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
     @MessageBody() data: { roomId: string; messageIds: string[] },
   ) {
-    const userId = client.handshake.auth.userId;
+    const userId = client.data.user.id;
     await this.chatService.markMessagesAsRead(userId, data.messageIds);
 
     // Notify other participants
