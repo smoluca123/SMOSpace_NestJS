@@ -413,6 +413,14 @@ export class UserController {
     });
   }
 
+  @Patch('/ban/users')
+  @banUsersDecorator()
+  async banUsers(@Body() banUserData: BanUsersDto) {
+    const result = await this.userService.banUsers(banUserData);
+
+    return result;
+  }
+
   @Patch('/ban/:userId')
   @banUserDecorator()
   async banUser(
@@ -439,16 +447,6 @@ export class UserController {
     });
   }
 
-  @Patch('/me')
-  @updateInformationDecorator()
-  async updateInfomation(
-    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
-    @Body() updateProfileDto: UpdateProfileDto,
-  ) {
-    const userId = decodedAccessToken.userId;
-    return this.userService.updateUserInformation(userId, updateProfileDto);
-  }
-
   @Patch('/:userId')
   @updateUserInformationDecorator()
   async updateUserInfomation(
@@ -458,12 +456,14 @@ export class UserController {
     return this.userService.updateUserInformation(userId, updateUserDto);
   }
 
-  @Patch('/ban/users')
-  @banUsersDecorator()
-  async banUsers(@Body() banUserData: BanUsersDto) {
-    const result = await this.userService.banUsers(banUserData);
-
-    return result;
+  @Patch('/me')
+  @updateInformationDecorator()
+  async updateInfomation(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
+    const userId = decodedAccessToken.userId;
+    return this.userService.updateUserInformation(userId, updateProfileDto);
   }
 
   @Delete('/friend/:userId')
