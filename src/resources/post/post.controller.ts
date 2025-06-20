@@ -244,6 +244,13 @@ export class PostController {
     });
   }
 
+  @Delete('admin/delete-posts')
+  @deletePostsDecorator()
+  deletePosts(@Body() data: DeletePostsDto) {
+    const { postIds } = data;
+    return this.postService.handleDeletePosts(postIds);
+  }
+
   @Delete('admin/:postId')
   @deletePostAsAdminDecorator()
   deletePostAsAdmin(
@@ -259,12 +266,5 @@ export class PostController {
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
   ) {
     return this.postService.deletePost({ postId, decodedAccessToken });
-  }
-
-  @Delete('admin/delete-posts')
-  @deletePostsDecorator()
-  deletePosts(@Body() data: DeletePostsDto) {
-    const { postIds } = data;
-    return this.postService.handleDeletePosts(postIds);
   }
 }
