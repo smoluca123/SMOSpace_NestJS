@@ -28,6 +28,7 @@ import {
 } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
+  CreateUserDto,
   BanUserDto,
   BanUsersDto,
   UpdateProfileDto,
@@ -37,12 +38,19 @@ import {
 import { SupabaseService } from 'src/services/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
 import { addMinutes, isPast } from 'date-fns';
-import { FriendStatus, Prisma, VerificationType } from '@prisma/client';
+import {
+  FriendStatus,
+  Prisma,
+  UserTypeEnum,
+  VerificationType,
+} from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { S3Service } from 'src/services/aws/s3/s3.service';
 import { IMAGE_PROCESS_OPTIONS } from 'src/constants/file.constants';
 import { NotificationService } from 'src/resources/notification/notification.service';
 import * as bcrypt from 'bcryptjs';
+import { AUTH_CONSTANTS } from 'src/resources/auth/auth.constants';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class UserService {
@@ -103,7 +111,7 @@ export class UserService {
       const totalAdmin = await this.prisma.user.count({
         where: {
           userType: {
-            typeName: 'Administrator',
+            typeName: UserTypeEnum.ADMIN,
           },
         },
       });
@@ -2350,6 +2358,76 @@ export class UserService {
         },
         statusCode: 201,
         date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async handleCreateUser({ data }: { data: CreateUserDto }) {
+    try {
+      const {
+        password,
+        isBanned,
+        isVerified,
+        isActive,
+        credits,
+        typeId,
+        ...restData
+      } = data;
+
+      const userId = uuidv4();
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const user = await this.prisma.user.create({
+        data: {
+          ...restData,
+          id: userId,
+          isBanned: isBanned ?? false,
+          isVerified: isVerified ?? false,
+          isActive: isActive ?? false,
+          password: hashedPassword,
+          credits: credits || 0,
+          userType: {
+            connect: {
+              id: typeId || AUTH_CONSTANTS.DEFAULT_USER_TYPE_ID,
+            },
+          },
+          createdAt: new Date(),
+          additionalInfo: {
+            connectOrCreate: {
+              where: {
+                userId,
+              },
+              create: {
+                userId,
+              },
+            },
+          },
+        },
+        select: userDataSelect,
+      });
+
+      return user;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async adminCreateUser({
+    data,
+  }: {
+    data: CreateUserDto;
+  }): Promise<IBeforeTransformResponseType<UserDataType>> {
+    try {
+      const user = await this.handleCreateUser({ data });
+
+      return {
+        type: 'response',
+        message: 'User created successfully',
+        data: user,
+        statusCode: 201,
       };
     } catch (error) {
       handleDefaultError(error);

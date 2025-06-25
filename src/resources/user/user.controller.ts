@@ -45,6 +45,7 @@ import {
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
 import {
+  CreateUserDto,
   BanUserDto,
   BanUsersDto,
   ChangeFriendshipStatusDto,
@@ -410,6 +411,17 @@ export class UserController {
     return this.userService.toggleBlockFriend({
       userId,
       currentUserId: decodedAccessToken.userId,
+    });
+  }
+
+  @Post('/admin/create-user')
+  @ApiOperation({
+    summary: 'Create a user',
+    description: 'Create a user in the database',
+  })
+  async adminCreateUser(@Body() bodyData: CreateUserDto) {
+    return this.userService.adminCreateUser({
+      data: bodyData,
     });
   }
 

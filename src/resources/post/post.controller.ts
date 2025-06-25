@@ -114,6 +114,48 @@ export class PostController {
     return this.postService.getTrendingTopics();
   }
 
+  @Get('/admin/get-post')
+  @getPostsAdminDecorator()
+  getPostsAdmin(
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+    @Query('keywords') keywords?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+
+    return this.postService.getPosts({
+      limit,
+      page,
+      keywords,
+      getPrivatePost: true,
+    });
+  }
+
+  @Get('/admin/get-post/:userId')
+  @getPostsAdminDecorator()
+  getPostsByUserIdAdmin(
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+    @Query('keywords') keywords?: string,
+    @Param('userId') userId?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+
+    return this.postService.getPosts({
+      limit,
+      page,
+      keywords,
+      getPrivatePost: true,
+      userId,
+    });
+  }
+
   @Get('get-likes/:postId')
   @getLikesPostDecorator()
   getLikesPost(
@@ -158,26 +200,6 @@ export class PostController {
       page,
       userId,
       likeUserId,
-    });
-  }
-
-  @Get('/admin/get-post')
-  @getPostsAdminDecorator()
-  getPostsAdmin(
-    @Query('limit') _limit?: string,
-    @Query('page') _page?: string,
-    @Query('keywords') keywords?: string,
-  ) {
-    const { limit, page } = normalizePaginationParams({
-      limit: +_limit,
-      page: +_page,
-    });
-
-    return this.postService.getPosts({
-      limit,
-      page,
-      keywords,
-      getPrivatePost: true,
     });
   }
 
