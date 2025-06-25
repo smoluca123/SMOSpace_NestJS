@@ -97,7 +97,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() createMessageDto: CreateMessageDto,
   ) {
     const userId = client.data.user.id;
-    const message = await this.chatService.createMessage(
+    const message = await this.chatService.handleCreateMessage(
       userId,
       createMessageDto,
     );

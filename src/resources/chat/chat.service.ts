@@ -72,7 +72,7 @@ export class ChatService {
     return !!participant;
   }
 
-  async createMessage(
+  async handleCreateMessage(
     userId: string,
     createMessageDto: CreateMessageDto,
   ): Promise<ChatMessageDataType> {
@@ -203,7 +203,7 @@ export class ChatService {
     });
   }
 
-  async createDirectChatRoom({
+  async handleCreateDirectChatRoom({
     userId1,
     userId2,
   }: {
@@ -239,7 +239,7 @@ export class ChatService {
     });
   }
 
-  async createGroupChatRoom(
+  async handleCreateGroupChatRoom(
     name: string,
     creatorId: string,
     participantIds: string[],

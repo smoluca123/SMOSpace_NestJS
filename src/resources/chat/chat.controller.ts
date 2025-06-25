@@ -35,13 +35,13 @@ export class ChatController {
   ) {
     const { userId } = decodedAccessToken;
     // Create or get existing direct chat room
-    const room = await this.chatService.createDirectChatRoom({
+    const room = await this.chatService.handleCreateDirectChatRoom({
       userId1: userId,
       userId2: targetUserId,
     });
 
     // Send the first message
-    const message = await this.chatService.createMessage(userId, {
+    const message = await this.chatService.handleCreateMessage(userId, {
       ...createFirstMessageDto,
       roomId: room.id,
     });

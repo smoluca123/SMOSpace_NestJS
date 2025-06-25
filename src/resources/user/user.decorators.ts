@@ -18,6 +18,7 @@ import { RolesLevel } from 'src/interfaces/interfaces.global';
 import {
   BanUsersDto,
   ChangeFriendshipStatusDto,
+  CreateUserDto,
   UserAvatarUpdateDto,
   UserCoverImageUpdateDto,
 } from 'src/resources/user/dto/user.dto';
@@ -431,4 +432,17 @@ export const getUserCountDecorator = () =>
       summary: 'Get user count',
       description: 'Get user count',
     }),
+  );
+
+export const adminCreateUserDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Create a user',
+      description: 'Create a user in the database',
+    }),
+    ApiBody({
+      type: CreateUserDto,
+      description: 'User data to create',
+    }),
+    Roles([RolesLevel.ADMIN]),
   );

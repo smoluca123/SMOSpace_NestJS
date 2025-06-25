@@ -14,6 +14,7 @@ import {
   IsUUID,
 } from 'class-validator';
 import { UUID } from 'crypto';
+import { UserRegisterDto } from 'src/resources/auth/dto/UserRegister.dto';
 
 export class UserAdditionalInfoDto {
   @ApiPropertyOptional({ default: '' })
@@ -182,4 +183,31 @@ export class BanUserItemDto {
   @IsBoolean()
   @IsNotEmpty()
   isBanned: boolean;
+}
+
+export class CreateUserDto extends UserRegisterDto {
+  @ApiProperty({ default: '' })
+  @IsString()
+  @IsOptional()
+  typeId?: string;
+  @ApiProperty({ default: false })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+  @ApiProperty({ default: false })
+  @IsBoolean()
+  @IsOptional()
+  isVerified?: boolean;
+  @ApiProperty({ default: false })
+  @IsBoolean()
+  @IsOptional()
+  isBanned?: boolean;
+  @ApiProperty({ default: 0 })
+  @IsNumber()
+  @IsOptional()
+  credits?: number;
+  @ApiProperty({ default: '' })
+  @IsString()
+  @IsOptional()
+  bio?: string;
 }

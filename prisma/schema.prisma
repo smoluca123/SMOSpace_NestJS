@@ -48,30 +48,30 @@ model AuthCode {
 //* New User Model
 
 model User {
-  id             String    @id @default(uuid())
-  username       String    @unique
-  email          String    @unique
-  bio            String?   @db.VarChar(1000)
-  gender         String?   @map("gender")
-  fullName       String    @map("full_name")
+  id             String      @id @default(uuid())
+  username       String      @unique
+  email          String      @unique
+  bio            String?     @db.VarChar(1000)
+  gender         UserGender? @map("gender")
+  fullName       String      @map("full_name")
   password       String?
-  displayName    String?   @map("display_name")
+  displayName    String?     @map("display_name")
   type           String
-  phoneNumber    String?   @map("phone_number")
+  phoneNumber    String?     @map("phone_number")
   age            Int?
-  refreshToken   String?   @map("refresh_token")
+  refreshToken   String?     @map("refresh_token")
   avatar         String?
-  coverImage     String?   @map("cover_image")
-  isActive       Boolean?  @default(false) @map("is_active")
-  isVerified     Boolean?  @default(false) @map("is_verified")
-  isBanned       Boolean?  @default(false) @map("is_banned")
-  createdAt      DateTime? @default(now()) @map("created_at")
-  updatedAt      DateTime? @default(now()) @updatedAt @map("updated_at")
-  credits        Decimal?  @default(0) @db.Decimal(10, 2)
-  postCount      Int       @default(0) @map("post_count")
-  followerCount  Int       @default(0) @map("follower_count")
-  followingCount Int       @default(0) @map("following_count")
-  friendCount    Int       @default(0) @map("friend_count")
+  coverImage     String?     @map("cover_image")
+  isActive       Boolean?    @default(false) @map("is_active")
+  isVerified     Boolean?    @default(false) @map("is_verified")
+  isBanned       Boolean?    @default(false) @map("is_banned")
+  createdAt      DateTime?   @default(now()) @map("created_at")
+  updatedAt      DateTime?   @default(now()) @updatedAt @map("updated_at")
+  credits        Decimal?    @default(0) @db.Decimal(10, 2)
+  postCount      Int         @default(0) @map("post_count")
+  followerCount  Int         @default(0) @map("follower_count")
+  followingCount Int         @default(0) @map("following_count")
+  friendCount    Int         @default(0) @map("friend_count")
 
   userType         UserType           @relation(fields: [type], references: [id], onDelete: Restrict)
   UserSession      UserSession[]
@@ -99,6 +99,12 @@ model User {
   @@map("users")
 }
 
+enum UserGender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 model UserAdditionalInfo {
   id        String    @id @default(uuid())
   userId    String    @unique @map("user_id")
@@ -121,11 +127,19 @@ model UserAdditionalInfo {
 //* New User Type Model
 
 model UserType {
-  id       String  @id @default(uuid())
-  typeName String? @map("type_name")
+  id       String       @id @default(uuid())
+  typeName UserTypeEnum @default(USER) @map("type_name")
   User     User[]
 
   @@map("user_types")
+}
+
+enum UserTypeEnum {
+  USER
+  VIP_USER
+  ADMIN
+  MODERATOR
+  SUPER_ADMIN
 }
 
 model Friend {
