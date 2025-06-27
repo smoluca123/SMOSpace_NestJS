@@ -41,6 +41,8 @@ import {
   getUserCountDecorator,
   banUsersDecorator,
   unFollowUserDecorator,
+  getUserTypeByIdDecorator,
+  getUserTypesDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -68,6 +70,12 @@ import { FriendStatus } from '@prisma/client';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  @Get('/types')
+  @getUserTypesDecorator()
+  async getUserTypes() {
+    return this.userService.getUserTypes();
+  }
+
   @Get('/count')
   @getUserCountDecorator()
   async getUserCount() {
@@ -92,6 +100,12 @@ export class UserController {
       limit,
       page,
     });
+  }
+
+  @Get('/types/:typeId')
+  @getUserTypeByIdDecorator()
+  async getUserTypeById(@Param('typeId') typeId: string) {
+    return this.userService.getUserTypeById({ typeId });
   }
 
   @Get('/friends/:userId')

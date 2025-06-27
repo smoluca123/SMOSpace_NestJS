@@ -1,4 +1,8 @@
 import {
+  userTypeDataSelect,
+  UserTypeDataType,
+} from './../../libs/prisma-types';
+import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -2428,6 +2432,51 @@ export class UserService {
         message: 'User created successfully',
         data: user,
         statusCode: 201,
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getUserTypes(): Promise<
+    IBeforeTransformResponseType<UserTypeDataType[]>
+  > {
+    try {
+      const userTypes = await this.prisma.userType.findMany({
+        select: userTypeDataSelect,
+      });
+
+      return {
+        type: 'response',
+        message: 'User types fetched successfully',
+        data: userTypes,
+        statusCode: 200,
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getUserTypeById({
+    typeId,
+  }: {
+    typeId: string;
+  }): Promise<IBeforeTransformResponseType<UserTypeDataType>> {
+    try {
+      const userType = await this.prisma.userType.findUnique({
+        where: { id: typeId },
+        select: userTypeDataSelect,
+      });
+
+      if (!userType) {
+        throw new NotFoundException('User type not found');
+      }
+
+      return {
+        type: 'response',
+        message: 'User type fetched successfully',
+        data: userType,
+        statusCode: 200,
       };
     } catch (error) {
       handleDefaultError(error);
