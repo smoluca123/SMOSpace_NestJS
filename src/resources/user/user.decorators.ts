@@ -446,3 +446,23 @@ export const adminCreateUserDecorator = () =>
     }),
     Roles([RolesLevel.ADMIN]),
   );
+
+export const getUserTypesDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get all user types',
+      description: 'Get all user types from the database',
+    }),
+  );
+
+export const getUserTypeByIdDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get user type by ID',
+      description: 'Get user type by ID from the database',
+    }),
+    ApiParam({
+      name: 'typeId',
+      description: 'ID of the user type to retrieve',
+    }),
+  );
