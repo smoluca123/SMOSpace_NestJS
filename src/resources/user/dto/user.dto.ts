@@ -95,6 +95,10 @@ export class UpdateUserDto extends UpdateProfileDto {
   @IsBoolean()
   @IsOptional()
   isBanned: boolean;
+  @ApiPropertyOptional({ default: 0 })
+  @IsNumber()
+  @IsOptional()
+  credits: number;
 }
 
 export class BanUserDto {
