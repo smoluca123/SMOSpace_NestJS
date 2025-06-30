@@ -13,6 +13,7 @@ import { Roles } from 'src/decorators/roles.decorator';
 import { RolesLevel } from 'src/global/enums.global';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 import { GeneratePostDto } from 'src/resources/post/dto/ai.dto';
+import { GenerateImagesDto } from 'src/resources/post/dto/post.dto';
 
 export const getPostsDecorator = () =>
   applyDecorators(
@@ -245,5 +246,33 @@ export const getPostCountDecorator = () =>
     ApiOperation({
       summary: 'Get post count',
       description: 'Get the total number of posts',
+    }),
+  );
+
+export const aiGenerateImagesDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Generate AI images',
+      description:
+        'Generate images using AI technology. Authentication required.',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+    ApiBody({
+      type: GenerateImagesDto,
+    }),
+    UseGuards(JwtTokenVerifyGuard),
+  );
+
+export const getPriceGenerateImagesDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get price for generate images',
+      description: 'Get the price for generate images',
+    }),
+    ApiBody({
+      type: GenerateImagesDto,
     }),
   );
