@@ -15,10 +15,12 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CreatePostDto,
   DeletePostsDto,
+  GenerateImagesDto,
   UpdatePostAsAdminDto,
   UpdatePostDto,
 } from 'src/resources/post/dto/post.dto';
 import {
+  aiGenerateImagesDecorator,
   aiGeneratePostDecorator,
   createPostDecorator,
   deletePostAsAdminDecorator,
@@ -30,6 +32,7 @@ import {
   getPostDecorator,
   getPostsAdminDecorator,
   getPostsDecorator,
+  getPriceGenerateImagesDecorator,
   getTrendingTopicsDecorator,
   likePostDecorator,
   updatePostAsAdminDecorator,
@@ -213,6 +216,25 @@ export class PostController {
       data,
       decodedAccessToken,
     });
+  }
+
+  @Post('/ai/generate-images')
+  @aiGenerateImagesDecorator()
+  aiGenerateImages(
+    @Body() data: GenerateImagesDto,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    const { userId } = decodedAccessToken;
+    return this.postService.aiGenerateImages({
+      data,
+      userId,
+    });
+  }
+
+  @Post('/ai/generate-images/price')
+  @getPriceGenerateImagesDecorator()
+  getPriceGenerateImages(@Body() data: GenerateImagesDto) {
+    return this.postService.getPriceGenerateImages(data);
   }
 
   @Post('/like/:postId')

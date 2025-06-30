@@ -32,12 +32,18 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { PostGateway } from 'src/resources/gateways/post/post.gateway';
 import {
   CreatePostDto,
+  GenerateImagesDto,
   UpdatePostAsAdminDto,
   UpdatePostDto,
 } from 'src/resources/post/dto/post.dto';
 import { S3Service } from 'src/services/aws/s3/s3.service';
 import { NotificationService } from 'src/resources/notification/notification.service';
 import { UUID } from 'crypto';
+import axios, { AxiosRequestConfig } from 'axios';
+import { ConfigService } from '@nestjs/config';
+import { generateImagesSchema } from 'src/resources/user/user.schemas';
+import { IGenerateImagesResponseType } from 'src/interfaces/ai.interfaces';
+import { UserService } from 'src/resources/user/user.service';
 
 @Injectable()
 export class PostService {
@@ -46,6 +52,8 @@ export class PostService {
     private readonly postGateway: PostGateway,
     private readonly s3Service: S3Service,
     private readonly notificationService: NotificationService,
+    private readonly configService: ConfigService,
+    private readonly userService: UserService,
   ) {}
   async validatePost<DataType = PostDataType>(
     postId: string,
@@ -873,6 +881,125 @@ export class PostService {
   }): Promise<IResponseType<PostDataType>> {
     try {
       return await this.handleDeletePost(postId);
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  handleCalculatePriceGenerateImages = (data: GenerateImagesDto) => {
+    const pricePerImage = 1; // 1 credit per image
+    const { numImages, steps } = data;
+    const stepsPrice = Math.ceil(steps / 10); // 10 steps = 1 credit
+
+    return pricePerImage * numImages * stepsPrice;
+  };
+
+  async handleGenerateImages({
+    data,
+  }: {
+    data: GenerateImagesDto;
+  }): Promise<IGenerateImagesResponseType> {
+    try {
+      const validatedData = generateImagesSchema.parse(data);
+
+      const { prompt, numImages, imageSize, seed } = validatedData;
+
+      const processedSeed =
+        seed === -1 ? Math.floor(Math.random() * 2147483647) : seed;
+
+      const processedImageSize = {
+        width: Number(imageSize.split('x')[0]),
+        height: Number(imageSize.split('x')[1]),
+      };
+
+      const options: AxiosRequestConfig = {
+        method: 'POST',
+        url: 'https://api.thehive.ai/api/v3/hive/flux-schnell-enhanced',
+        headers: {
+          accept: 'application/json',
+          Authorization: `Bearer ${this.configService.get('THEHIVE_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        data: {
+          input: {
+            prompt,
+            num_images: numImages,
+            image_size: processedImageSize,
+            seed: processedSeed,
+            output_format: 'png',
+          },
+        },
+      };
+
+      const { data: responseData } = await axios(options);
+
+      return responseData;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getPriceGenerateImages(
+    data: GenerateImagesDto,
+  ): Promise<IBeforeTransformResponseType<{ price: number }>> {
+    const price = this.handleCalculatePriceGenerateImages(data);
+    return {
+      type: 'response',
+      message: 'Price fetched successfully',
+      data: { price },
+    };
+  }
+
+  async aiGenerateImages({
+    userId,
+    data,
+  }: {
+    userId: string;
+    data: GenerateImagesDto;
+  }): Promise<
+    IBeforeTransformResponseType<
+      IBaseResponseAIType & {
+        data: IGenerateImagesResponseType;
+      }
+    >
+  > {
+    try {
+      const user = await this.userService.validateUser({
+        userId,
+        selectData: {
+          id: true,
+          credits: true,
+        },
+      });
+
+      const price = this.handleCalculatePriceGenerateImages(data);
+      if (user.credits.toNumber() < price) {
+        throw new BadRequestException('Insufficient credits');
+      }
+
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          credits: {
+            decrement: price,
+          },
+        },
+        select: {
+          credits: true,
+        },
+      });
+
+      const responseData = await this.handleGenerateImages({ data });
+      return {
+        type: 'response',
+        message: 'Images generated successfully',
+        data: {
+          price: `${price} credits`,
+          priceNum: price,
+          currentCredits: updatedUser.credits,
+          data: responseData,
+        },
+      };
     } catch (error) {
       handleDefaultError(error);
     }
