@@ -82,7 +82,7 @@ export class UpdateUserDto extends UpdateProfileDto {
   @ApiPropertyOptional({ default: '' })
   @IsString()
   @IsOptional()
-  type: string;
+  typeId: string;
   @ApiPropertyOptional({ default: false })
   @IsBoolean()
   @IsOptional()

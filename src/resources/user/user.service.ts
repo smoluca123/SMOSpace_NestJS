@@ -38,6 +38,7 @@ import {
   UpdateProfileDto,
   UserActiveByCodeDto,
   UserResetPasswordDto,
+  UpdateUserDto,
 } from 'src/resources/user/dto/user.dto';
 import { SupabaseService } from 'src/services/supabase/supabase.service';
 import { EmailService } from 'src/resources/email/email.service';
@@ -473,7 +474,8 @@ export class UserService {
    * @param data The data object containing the updated information.
    * @returns A promise that resolves to an object containing the response type, including the user's updated information.
    */
-  async updateUserInformation(userId: string, data: UpdateProfileDto) {
+
+  async updateProfileInformation(userId: string, data: UpdateProfileDto) {
     try {
       // Check if the userId is provided and throw an error if not.
       if (!userId) throw new BadRequestException('User ID is required');
@@ -517,6 +519,80 @@ export class UserService {
         },
         data: {
           ...restData,
+          additionalInfo: {
+            update: {
+              data: {
+                ...additionalInfo,
+              },
+              where: {
+                userId: userId,
+              },
+            },
+          },
+        },
+        select: userDataSelect,
+      });
+      // Throw an error if the user is not found.
+      if (!user) throw new NotFoundException('User not found');
+
+      // Return a successful response with the updated user data.
+      return {
+        message: 'Update profile information successfully',
+        data: user,
+        statusCode: 201,
+        date: new Date(),
+      };
+    } catch (error) {
+      // Handle any errors that occur during the process.
+      handleDefaultError(error);
+    }
+  }
+
+  async updateUserInformation(userId: string, data: UpdateUserDto) {
+    try {
+      // Check if the userId is provided and throw an error if not.
+      if (!userId) throw new BadRequestException('User ID is required');
+
+      // Iterate through each key in the data object to process the values.
+      const processedData = await processDataObject(data);
+
+      const { additionalInfo, typeId, ...restData } = processedData;
+
+      let userAdditionalInfo = await this.prisma.userAdditionalInfo.findUnique({
+        where: {
+          userId: userId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!userAdditionalInfo) {
+        userAdditionalInfo = await this.prisma.userAdditionalInfo.create({
+          data: {
+            userId: userId,
+            ...additionalInfo,
+          },
+        });
+
+        await this.prisma.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            userAdditionalInfoId: userAdditionalInfo.id,
+          },
+        });
+      }
+
+      // Update the user with the processed data.
+      const user = await this.prisma.user.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          ...restData,
+          ...(typeId ? { userType: { connect: { id: typeId } } } : {}),
           additionalInfo: {
             update: {
               data: {
