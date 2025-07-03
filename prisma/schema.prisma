@@ -440,6 +440,9 @@ model ChatRoom {
   updatedAt DateTime       @updatedAt @map("updated_at")
   status    ChatRoomStatus @default(PENDING) @map("status")
 
+  lastMessageId String?      @unique @map("last_message_id")
+  lastMessage   ChatMessage? @relation("LastMessage", fields: [lastMessageId], references: [id])
+
   // Participants in the chat room
   participants ChatParticipant[]
   messages     ChatMessage[]
@@ -473,10 +476,11 @@ model ChatMessage {
   updatedAt DateTime    @updatedAt @map("updated_at")
   readBy    String[]    @map("read_by")
 
-  room    ChatRoom      @relation(fields: [roomId], references: [id])
-  sender  User          @relation(fields: [senderId], references: [id])
-  replyTo ChatMessage?  @relation("MessageReply", fields: [replyToId], references: [id])
-  replies ChatMessage[] @relation("MessageReply")
+  room              ChatRoom      @relation(fields: [roomId], references: [id])
+  sender            User          @relation(fields: [senderId], references: [id])
+  replyTo           ChatMessage?  @relation("MessageReply", fields: [replyToId], references: [id])
+  replies           ChatMessage[] @relation("MessageReply")
+  lastMessageOfRoom ChatRoom?     @relation("LastMessage")
 
   @@index([roomId, createdAt])
   @@map("chat_messages")

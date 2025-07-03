@@ -52,7 +52,7 @@ export class ChatController {
     };
   }
 
-  @Get('rooms')
+  @Get('active-rooms')
   @getUserRoomsDecorator()
   async getUserRooms(
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,

@@ -33,8 +33,9 @@ export class ChatService {
     userId: string;
     limit?: number;
     page?: number;
-  }): Promise<IBeforeTransformPaginationResponseType<ChatRoom>> {
+  }): Promise<IBeforeTransformPaginationResponseType<ChatRoomDataType>> {
     const whereQuery: Prisma.ChatRoomWhereInput = {
+      status: ChatRoomStatus.APPROVED,
       participants: {
         some: {
           userId,
@@ -357,7 +358,7 @@ export class ChatService {
   }: {
     roomId: string;
     rejecterId: string;
-  }): Promise<IBeforeTransformResponseType<ChatRoom>> {
+  }): Promise<IBeforeTransformResponseType<ChatRoomDataType>> {
     // Similar to approveMessage but sets status to REJECTED
     const room = await this.prisma.chatRoom.findUnique({
       where: {
@@ -384,7 +385,7 @@ export class ChatService {
   }: {
     limit?: number;
     page?: number;
-  }): Promise<IBeforeTransformPaginationResponseType<ChatRoom>> {
+  }): Promise<IBeforeTransformPaginationResponseType<ChatRoomDataType>> {
     const whereQuery: Prisma.ChatRoomWhereInput = {
       status: ChatRoomStatus.PENDING,
     };

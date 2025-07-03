@@ -275,7 +275,7 @@ export const chatParticipantDataSelect = {
     select: {
       id: true,
       username: true,
-      displayName: true,
+      fullName: true,
       avatar: true,
     },
   },
@@ -292,6 +292,22 @@ export const chatRoomDataSelect = {
   updatedAt: true,
   type: true,
   name: true,
+  lastMessage: {
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      updatedAt: true,
+      sender: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatar: true,
+        },
+      },
+    },
+  },
   participants: {
     select: chatParticipantDataSelect,
   },
