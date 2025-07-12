@@ -16,6 +16,9 @@ export class ResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
       map((data) => {
+        if (data.buffer || data.skipHandleResponse) {
+          return data;
+        }
         // If data is already formatted as IResponseType or IPaginationResponseType, return as is
         if (this.isFormattedResponse(data)) {
           return data;

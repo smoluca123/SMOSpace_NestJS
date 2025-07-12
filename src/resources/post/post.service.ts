@@ -990,6 +990,13 @@ export class PostService {
       });
 
       const responseData = await this.handleGenerateImages({ data });
+
+      const images = await this.s3Service.uploadFilesFromUrls(
+        responseData.output.map((img) => img.url),
+        responseData.output.map((_, index) => `ai-image-${index}.png`),
+        userId,
+      );
+
       return {
         type: 'response',
         message: 'Images generated successfully',
@@ -997,7 +1004,10 @@ export class PostService {
           price: `${price} credits`,
           priceNum: price,
           currentCredits: updatedUser.credits,
-          data: responseData,
+          data: {
+            ...responseData,
+            output: images.map((img) => ({ url: img.url })),
+          },
         },
       };
     } catch (error) {
