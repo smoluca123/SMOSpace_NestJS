@@ -1,13 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
-import {
-  ChatRoom,
-  ChatMessage,
-  ChatRole,
-  ChatRoomStatus,
-  Prisma,
-} from '@prisma/client';
+import { ChatRoom, ChatRole, ChatRoomStatus, Prisma } from '@prisma/client';
 import {
   IBeforeTransformPaginationResponseType,
   IBeforeTransformResponseType,
@@ -50,6 +44,7 @@ export class ChatService {
       skip: (page - 1) * limit,
       select: chatRoomDataSelect,
     });
+
     return {
       type: 'pagination',
       message: 'User active rooms',
@@ -272,7 +267,7 @@ export class ChatService {
     limit: number;
     page: number;
     before?: Date;
-  }): Promise<IBeforeTransformPaginationResponseType<ChatMessage>> {
+  }): Promise<IBeforeTransformPaginationResponseType<ChatMessageDataType>> {
     const whereQuery: Prisma.ChatMessageWhereInput = {
       roomId,
       ...(before && {
@@ -283,32 +278,33 @@ export class ChatService {
     const messages = await this.prisma.chatMessage.findMany({
       where: whereQuery,
       orderBy: {
-        createdAt: 'desc',
+        createdAt: 'asc',
       },
       take: limit,
       skip: (page - 1) * limit,
-      include: {
-        sender: {
-          select: {
-            id: true,
-            username: true,
-            displayName: true,
-            avatar: true,
-          },
-        },
-        replyTo: {
-          include: {
-            sender: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatar: true,
-              },
-            },
-          },
-        },
-      },
+      // include: {
+      //   sender: {
+      //     select: {
+      //       id: true,
+      //       username: true,
+      //       displayName: true,
+      //       avatar: true,
+      //     },
+      //   },
+      //   replyTo: {
+      //     include: {
+      //       sender: {
+      //         select: {
+      //           id: true,
+      //           username: true,
+      //           displayName: true,
+      //           avatar: true,
+      //         },
+      //       },
+      //     },
+      //   },
+      // },
+      select: chatMessageDataSelect,
     });
     return {
       type: 'pagination',

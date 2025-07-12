@@ -10,6 +10,7 @@ import { Injectable } from '@nestjs/common';
 
 import { ConfigService } from '@nestjs/config';
 import { MediaType } from '@prisma/client';
+import axios from 'axios';
 import { loadEsm } from 'load-esm';
 
 import * as sharp from 'sharp';
@@ -156,6 +157,50 @@ export class S3Service {
 
     const url = `${this.configService.get('S3_PUBLIC_PATH_PREFIX')}/${key}`;
     return { data: { ...data, uploadedFile: response }, url };
+  }
+
+  async uploadFileFromUrl(
+    url: string,
+    name: string,
+    userId: string,
+    postId?: string,
+  ) {
+    const response = await axios.get(url, { responseType: 'arraybuffer' });
+
+    // Convert the downloaded data to a mock Express.Multer.File object
+    const multerFile: Express.Multer.File = {
+      fieldname: 'file',
+      originalname: name,
+      encoding: '7bit',
+      mimetype: 'image/png',
+      size: response.data.byteLength,
+      buffer: Buffer.from(response.data),
+      stream: undefined as any,
+      destination: '',
+      filename: name,
+      path: '',
+    };
+
+    // You may need to pass userId and postId as arguments to this function or set them here
+    // For now, we'll set them as undefined
+    return this.uploadFile(multerFile, name, {
+      type: 'IMAGE',
+      userId,
+      postId,
+    });
+  }
+
+  async uploadFilesFromUrls(
+    urls: string[],
+    names: string[],
+    userId: string,
+    postId?: string,
+  ) {
+    const uploadPromises = urls.map((url, index) =>
+      this.uploadFileFromUrl(url, names[index], userId, postId),
+    );
+    const results = await Promise.all(uploadPromises);
+    return results;
   }
 
   async deleteFile(url: string) {
