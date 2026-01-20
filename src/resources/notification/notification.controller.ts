@@ -13,12 +13,17 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import {
   changeNotificationStatusDecorator,
+  getGroupedNotificationsDecorator,
   getNotificationsDecorator,
   getUserNotificationsDecorator,
+  markGroupAsReadDecorator,
 } from 'src/resources/notification/notification.decorators';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
-import { ChangeNotificationStatusDto } from 'src/resources/notification/notification.dto';
+import {
+  ChangeNotificationStatusDto,
+  MarkGroupAsReadDto,
+} from 'src/resources/notification/notification.dto';
 
 @ApiTags('Notification Management')
 @ApiBearerAuth()
@@ -26,6 +31,29 @@ import { ChangeNotificationStatusDto } from 'src/resources/notification/notifica
 @Controller('notification')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
+
+  @Get('grouped')
+  @getGroupedNotificationsDecorator()
+  async getGroupedNotifications(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('page') pageParam?: string,
+    @Query('limit') limitParam?: string,
+    @Query('groupByTime') groupByTimeParam?: string,
+  ) {
+    const { page, limit } = normalizePaginationParams({
+      page: Number(pageParam),
+      limit: Number(limitParam),
+    });
+
+    const groupByTime = groupByTimeParam ? Number(groupByTimeParam) : 24;
+
+    return this.notificationService.getGroupedNotifications({
+      userId: decodedAccessToken.userId,
+      page,
+      limit,
+      groupByTime,
+    });
+  }
 
   @Get(':userId')
   @getUserNotificationsDecorator()
@@ -75,5 +103,14 @@ export class NotificationController {
       notificationId,
       isRead: data.isRead,
     });
+  }
+
+  @Patch('/group/status')
+  @markGroupAsReadDecorator()
+  async markGroupAsRead(@Body() data: MarkGroupAsReadDto) {
+    return this.notificationService.markNotificationsAsRead(
+      data.notificationIds,
+      data.isRead,
+    );
   }
 }

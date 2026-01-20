@@ -128,7 +128,7 @@ model UserAdditionalInfo {
 
 model UserType {
   id       String       @id @default(uuid())
-  typeName UserTypeEnum @default(USER) @map("type_name")
+  typeName UserTypeEnum @unique @default(USER) @map("type_name")
   User     User[]
 
   @@map("user_types")

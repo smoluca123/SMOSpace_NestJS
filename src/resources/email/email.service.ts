@@ -26,7 +26,7 @@ export class EmailService {
   }
 
   async sendEmail({
-    from = 'SMOTeam <admin@support.smoteam.com>',
+    from,
     to,
     subject,
     htmlbody,
@@ -36,16 +36,20 @@ export class EmailService {
     subject: string;
     htmlbody: string;
   }) {
-    const fromArgs = from.split('@');
+    const defaultFrom = `${this.config.get('MAILER_FROM_NAME')} <${this.config.get('MAILER_FROM_ADDRESS')}>`;
+    const emailFrom = from || defaultFrom;
 
-    if (!fromArgs.pop().includes('support.smoteam.com'))
+    const fromArgs = emailFrom.split('@');
+    const allowedDomain = this.config.get('MAILER_FROM_ADDRESS').split('@')[1];
+
+    if (!fromArgs.pop().includes(allowedDomain))
       throw new Error('Mail is not supported');
 
     const client = new MailPace.DomainClient(this.config.get('MAILER_USER'));
 
     try {
       const data = await client.sendEmail({
-        from: from || 'admin@support.smoteam.com',
+        from: emailFrom,
         to,
         subject,
         htmlbody,

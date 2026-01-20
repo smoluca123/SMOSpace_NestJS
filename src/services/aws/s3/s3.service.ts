@@ -268,7 +268,7 @@ export class S3Service {
     file.buffer = processedBuffer;
     file.size = processedBuffer.length;
 
-    return this.uploadFile(file, name, {
+    return this.uploadFile(file, name + '.webp', {
       type: 'IMAGE',
       userId,
       postId,

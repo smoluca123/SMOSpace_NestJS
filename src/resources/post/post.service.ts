@@ -531,6 +531,33 @@ export class PostService {
         }),
       ]);
 
+      // Handle notification: create when like, delete when unlike
+      if (isLiked) {
+        // Unlike: delete notification
+        await this.notificationService.deleteLikePostNotification({
+          recipientId: post.author.id,
+          senderId: decodedAccessToken.userId,
+          postId,
+        });
+      } else {
+        // Like: create notification (skip if self-like)
+        if (post.author.id !== decodedAccessToken.userId) {
+          const senderData = await this.prisma.user.findUnique({
+            where: { id: decodedAccessToken.userId },
+            select: userDataSelect,
+          });
+
+          if (senderData) {
+            await this.notificationService.createLikePostNotification({
+              recipientId: post.author.id,
+              senderId: decodedAccessToken.userId,
+              postId,
+              senderData,
+            });
+          }
+        }
+      }
+
       return {
         message: 'Post liked/unliked successfully',
         data: { ...updatedPost, isLiked: !isLiked },

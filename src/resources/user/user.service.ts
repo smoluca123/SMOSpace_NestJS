@@ -54,7 +54,6 @@ import { S3Service } from 'src/services/aws/s3/s3.service';
 import { IMAGE_PROCESS_OPTIONS } from 'src/constants/file.constants';
 import { NotificationService } from 'src/resources/notification/notification.service';
 import * as bcrypt from 'bcryptjs';
-import { AUTH_CONSTANTS } from 'src/resources/auth/auth.constants';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -141,19 +140,29 @@ export class UserService {
     limit = 10,
     page = 1,
     currentUserId,
+    notFilters,
   }: {
     keywords?: string;
     limit?: number;
     page?: number;
     currentUserId?: string;
+    notFilters?: Prisma.UserWhereInput['NOT'];
   }): Promise<
     IBeforeTransformPaginationResponseType<
       UserDataType | (UserDataWithIsFollowedType & { friend: FriendDataType })
     >
   > {
     try {
+      console.log(notFilters);
       // Build where query to search across multiple user fields
       const whereQuery: Prisma.UserWhereInput = {
+        ...(notFilters
+          ? {
+              NOT: {
+                OR: Array.isArray(notFilters) ? notFilters : [notFilters],
+              },
+            }
+          : {}),
         OR: [
           { username: { contains: keywords } },
           { email: { contains: keywords } },
@@ -230,6 +239,28 @@ export class UserService {
         },
         statusCode: 200,
       };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async adminGetAllUsers({
+    keywords = '',
+    limit = 10,
+    page = 1,
+  }: {
+    keywords?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<IBeforeTransformPaginationResponseType<UserDataType>> {
+    try {
+      const result = await this.getAllUsers({
+        keywords,
+        limit,
+        page,
+        notFilters: {},
+      });
+      return result;
     } catch (error) {
       handleDefaultError(error);
     }
@@ -689,6 +720,7 @@ export class UserService {
         userId,
         selectData: null,
       });
+      console.log(file);
 
       // const { url } = await this.supabase.uploadFile(file);
 
@@ -2446,15 +2478,8 @@ export class UserService {
 
   async handleCreateUser({ data }: { data: CreateUserDto }) {
     try {
-      const {
-        password,
-        isBanned,
-        isVerified,
-        isActive,
-        credits,
-        typeId,
-        ...restData
-      } = data;
+      const { password, isBanned, isVerified, isActive, credits, ...restData } =
+        data;
 
       const userId = uuidv4();
 
@@ -2470,8 +2495,13 @@ export class UserService {
           password: hashedPassword,
           credits: credits || 0,
           userType: {
-            connect: {
-              id: typeId || AUTH_CONSTANTS.DEFAULT_USER_TYPE_ID,
+            connectOrCreate: {
+              where: {
+                typeName: 'USER',
+              },
+              create: {
+                typeName: 'USER',
+              },
             },
           },
           createdAt: new Date(),

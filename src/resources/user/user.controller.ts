@@ -43,6 +43,7 @@ import {
   unFollowUserDecorator,
   getUserTypeByIdDecorator,
   getUserTypesDecorator,
+  adminGetAllUsersDecorator,
 } from 'src/resources/user/user.decorators';
 import { IDecodedAccecssTokenType } from 'src/interfaces/interfaces.global';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -222,6 +223,24 @@ export class UserController {
     return this.userService.getFollowings({ userId, limit, page });
   }
 
+  @Get('admin/users')
+  @adminGetAllUsersDecorator()
+  async adminGetAllUsers(
+    @Query('page') _page: string,
+    @Query('limit') _limit: string,
+    @Query('keywords') keywords: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.userService.getAllUsers({
+      keywords,
+      limit,
+      page,
+    });
+  }
+
   @Get('/')
   @getAllUsersDecorator()
   async getAllUsers(
@@ -239,6 +258,10 @@ export class UserController {
       limit,
       page,
       currentUserId,
+      notFilters: {
+        id: currentUserId,
+        // isBanned: true,
+      },
     });
   }
 

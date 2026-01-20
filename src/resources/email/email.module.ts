@@ -13,14 +13,14 @@ import { MailerModule } from '@nestjs-modules/mailer';
         transport: {
           host: configService.get('MAILER_HOST'),
           port: configService.get('MAILER_PORT'),
-          secure: true,
+          secure: configService.get('MAILER_SECURE') === 'true', // Read from env
           auth: {
             user: configService.get('MAILER_USER'),
             pass: configService.get('MAILER_PASS'),
           },
         },
         defaults: {
-          from: '"SMOTeam" <admin@support.smoteam.com>',
+          from: `"${configService.get('MAILER_FROM_NAME')}" <${configService.get('MAILER_FROM_ADDRESS')}>`,
         },
         template: {
           dir: join(__dirname, 'templates'),

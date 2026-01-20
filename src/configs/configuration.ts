@@ -3,6 +3,9 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const configuration = () => ({
+  // Environment
+  NODE_ENV: process.env.NODE_ENV || 'development',
+
   // Server
   SERVER_PORT: parseInt(process.env.SERVER_PORT || '8080', 10),
 
