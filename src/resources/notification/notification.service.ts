@@ -24,6 +24,8 @@ import {
   INotificationFriendRequestPayload,
   INotificationLikePayload,
   INotificationReplyCommentPayload,
+  INotificationPostMentionPayload,
+  INotificationCommentMentionPayload,
 } from 'src/resources/notification/notification.interfaces';
 import {
   extractEntityIdFromMetadata,
@@ -711,7 +713,7 @@ export class NotificationService {
         const actionText = getActionTextByType(latest.type.type);
         const groupedMessage = this.buildGroupedMessageFromSenders(
           senders,
-          group.notifications.length,
+          group.senderMap.size,
           actionText,
         );
 
@@ -828,6 +830,139 @@ export class NotificationService {
         statusCode: 200,
         date: new Date(),
       };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  // ==================== MENTION NOTIFICATIONS ====================
+
+  /**
+   * Create notification for users mentioned in a post
+   */
+  async createPostMentionNotification(
+    payload: INotificationPostMentionPayload,
+  ) {
+    try {
+      // Skip if sender is recipient (self-mention)
+      if (payload.senderId === payload.recipientId) return;
+
+      const message = this.formatMessage(
+        NOTIFICATION_MESSAGES.POST_MENTION.message,
+        { username: payload.senderData.username },
+      );
+
+      const newNotification = await this.prisma.notification.create({
+        data: {
+          content: {
+            title: NOTIFICATION_MESSAGES.POST_MENTION.title,
+            message,
+          },
+          entityType: EntityType.POST,
+          metadata: {
+            postId: payload.postId,
+            mentionedBy: {
+              username: payload.senderData.username,
+              fullName: payload.senderData.fullName,
+              avatar: payload.senderData.avatar,
+            },
+          },
+          priority: NotificationPriority.NORMAL,
+          type: this.buildNotificationTypeConnect(
+            NotificationType_Type.POST_MENTION,
+          ),
+          sender: { connect: { id: payload.senderId } },
+          recipient: { connect: { id: payload.recipientId } },
+        },
+        select: notificationDataSelect,
+      });
+
+      this.notificationGateway.emitNewNotification(newNotification);
+      return newNotification;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  /**
+   * Create notification for users mentioned in a comment
+   */
+  async createCommentMentionNotification(
+    payload: INotificationCommentMentionPayload,
+  ) {
+    try {
+      // Skip if sender is recipient (self-mention)
+      if (payload.senderId === payload.recipientId) return;
+
+      const message = this.formatMessage(
+        NOTIFICATION_MESSAGES.COMMENT_MENTION.message,
+        { username: payload.senderData.username },
+      );
+
+      const newNotification = await this.prisma.notification.create({
+        data: {
+          content: {
+            title: NOTIFICATION_MESSAGES.COMMENT_MENTION.title,
+            message,
+          },
+          entityType: EntityType.COMMENT,
+          metadata: {
+            postId: payload.postId,
+            commentId: payload.commentId,
+            mentionedBy: {
+              username: payload.senderData.username,
+              fullName: payload.senderData.fullName,
+              avatar: payload.senderData.avatar,
+            },
+          },
+          priority: NotificationPriority.NORMAL,
+          type: this.buildNotificationTypeConnect(
+            NotificationType_Type.COMMENT_MENTION,
+          ),
+          sender: { connect: { id: payload.senderId } },
+          recipient: { connect: { id: payload.recipientId } },
+        },
+        select: notificationDataSelect,
+      });
+
+      this.notificationGateway.emitNewNotification(newNotification);
+      return newNotification;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  /**
+   * Delete all mention notifications for a specific post
+   */
+  async deletePostMentionNotifications(postId: string) {
+    try {
+      await this.prisma.notification.updateMany({
+        where: {
+          type: { type: NotificationType_Type.POST_MENTION },
+          metadata: { path: ['postId'], equals: postId },
+          isDeleted: false,
+        },
+        data: { isDeleted: true },
+      });
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  /**
+   * Delete all mention notifications for a specific comment
+   */
+  async deleteCommentMentionNotifications(commentId: string) {
+    try {
+      await this.prisma.notification.updateMany({
+        where: {
+          type: { type: NotificationType_Type.COMMENT_MENTION },
+          metadata: { path: ['commentId'], equals: commentId },
+          isDeleted: false,
+        },
+        data: { isDeleted: true },
+      });
     } catch (error) {
       handleDefaultError(error);
     }

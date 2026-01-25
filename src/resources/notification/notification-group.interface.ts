@@ -74,9 +74,15 @@ export function extractEntityIdFromMetadata(
     case EntityType.POST:
       return (metadata.postId as string) ?? null;
     case EntityType.FOLLOW:
-      return (metadata.follower as { id?: string })?.id ?? null;
+      // For FOLLOW notifications, we don't use a specific entityId
+      // This allows all follow notifications for the same recipient to be grouped together
+      // The groupKey will be based on: type + entityType + recipientId (implicit) + timeBucket
+      return null;
     case EntityType.FRIENDSHIP:
-      return (metadata.friend as { id?: string })?.id ?? null;
+      // For FRIENDSHIP notifications, we don't use a specific entityId
+      // This allows all friend request notifications for the same recipient to be grouped together
+      // The groupKey will be based on: type + entityType + recipientId (implicit) + timeBucket
+      return null;
     default:
       return null;
   }
@@ -112,7 +118,7 @@ export function buildGroupedMessage(
     return `${senders[0].fullName} ${actionText}`;
   }
 
-  if (count === 2) {
+  if (count === 2 && senders.length === 2) {
     return `${senders[0].fullName} and ${senders[1].fullName} ${actionText}`;
   }
 
@@ -140,6 +146,8 @@ export function getActionTextByType(type: NotificationType_Type): string {
     [NotificationType_Type.FOLLOW_USER]: 'followed you',
     [NotificationType_Type.FRIEND_REQUEST]: 'sent you a friend request',
     [NotificationType_Type.FRIEND_ACCEPT]: 'accepted your friend request',
+    [NotificationType_Type.POST_MENTION]: 'mentioned you in a post',
+    [NotificationType_Type.COMMENT_MENTION]: 'mentioned you in a comment',
   };
 
   return actionTexts[type] ?? 'đã tương tác với bạn';

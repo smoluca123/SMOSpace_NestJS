@@ -413,7 +413,7 @@ export class PostService {
   ): Promise<IResponseType<PostDataType>> {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { images: imagesData, ...postData } = data;
+      const { images: imagesData, mentionedUserIds, ...postData } = data;
       const { userId } = decodedAccessToken;
       const [, post] = await this.prisma.$transaction([
         this.prisma.user.update({
@@ -443,6 +443,30 @@ export class PostService {
           userId,
           postId: post.id,
         });
+      }
+
+      // Handle mention notifications (only for public posts)
+      if (mentionedUserIds && mentionedUserIds.length > 0 && !post.isPrivate) {
+        // Filter out self-mentions and get unique user IDs
+        const uniqueMentionedUserIds = [
+          ...new Set(mentionedUserIds.filter((id) => id !== userId)),
+        ];
+
+        // Create mention notifications for all mentioned users
+        const mentionPromises = uniqueMentionedUserIds.map((mentionedUserId) =>
+          this.notificationService.createPostMentionNotification({
+            senderId: userId,
+            recipientId: mentionedUserId,
+            postId: post.id,
+            senderData: {
+              username: post.author.username,
+              fullName: post.author.fullName,
+              avatar: post.author.avatar,
+            } as any, // Type cast since we only need these fields
+          }),
+        );
+
+        await Promise.allSettled(mentionPromises);
       }
 
       // Emit new post to all connected clients

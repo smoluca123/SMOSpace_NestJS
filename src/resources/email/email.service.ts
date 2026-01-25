@@ -5,13 +5,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
-// import { MailerService } from '@nestjs-modules/mailer';
+import { RateLimiterService } from 'src/common/services/rate-limiter.service';
+import {
+  EMAIL_RATE_LIMITS,
+  RATE_LIMIT_KEY_PREFIXES,
+} from 'src/common/constants/rate-limits.constants';
 
 @Injectable()
 export class EmailService {
   constructor(
     private mailerService: MailerService,
     private readonly config: ConfigService,
+    private readonly rateLimiter: RateLimiterService,
   ) {}
 
   compileTemplate(templateName: string, context: any): string {
@@ -73,6 +78,13 @@ export class EmailService {
       confirmationLink?: string;
     };
   }) {
+    // Apply rate limiting per recipient email
+    await this.rateLimiter.enforceLimit({
+      key: `${RATE_LIMIT_KEY_PREFIXES.EMAIL_ACTIVATION}:${email}`,
+      limit: EMAIL_RATE_LIMITS.ACTIVATION.limit,
+      window: EMAIL_RATE_LIMITS.ACTIVATION.window,
+    });
+
     await this.mailerService.sendMail({
       to: email,
       subject: `SMO - Active Account`,
@@ -95,6 +107,13 @@ export class EmailService {
       confirmationLink?: string;
     };
   }) {
+    // Apply rate limiting per recipient email
+    await this.rateLimiter.enforceLimit({
+      key: `${RATE_LIMIT_KEY_PREFIXES.EMAIL_FORGOT_PASSWORD}:${email}`,
+      limit: EMAIL_RATE_LIMITS.FORGOT_PASSWORD.limit,
+      window: EMAIL_RATE_LIMITS.FORGOT_PASSWORD.window,
+    });
+
     await this.mailerService.sendMail({
       to: email,
       subject: `SMO - Forgot Password`,

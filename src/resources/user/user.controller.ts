@@ -63,13 +63,17 @@ import { normalizePaginationParams } from 'src/utils/utils';
 import { AuthGuard } from '@nestjs/passport';
 import { RoleGuard } from 'src/guards/role.guard';
 import { FriendStatus } from '@prisma/client';
+import { FriendService } from 'src/resources/user/friend.service';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RoleGuard)
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly userFriendService: FriendService,
+  ) {}
 
   @Get('/types')
   @getUserTypesDecorator()
@@ -96,7 +100,7 @@ export class UserController {
       page: +_page,
     });
 
-    return this.userService.getPendingFriendsRequest({
+    return this.userFriendService.getPendingFriendsRequest({
       userId,
       limit,
       page,
@@ -120,7 +124,7 @@ export class UserController {
       limit: +_limit,
       page: +_page,
     });
-    return this.userService.getFriendList({
+    return this.userFriendService.getFriendList({
       userId,
       limit,
       page,
@@ -134,7 +138,7 @@ export class UserController {
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
   ) {
     const { userId: currentUserId } = decodedAccessToken;
-    return this.userService.getFriendByUserId({
+    return this.userFriendService.getFriendByUserId({
       currentUserId,
       friendId: userId,
     });
@@ -152,7 +156,7 @@ export class UserController {
       limit: +_limit,
       page: +_page,
     });
-    return this.userService.getFriendList({
+    return this.userFriendService.getFriendList({
       userId,
       limit,
       page,
@@ -410,7 +414,7 @@ export class UserController {
     @Param('userId') userId: string,
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
   ) {
-    return this.userService.toggleFriendshipRequest({
+    return this.userFriendService.toggleFriendshipRequest({
       userId,
       currentUserId: decodedAccessToken.userId,
     });
@@ -425,12 +429,12 @@ export class UserController {
   ) {
     switch (data.status) {
       case FriendStatus.ACCEPTED:
-        return this.userService.acceptFriendshipRequest({
+        return this.userFriendService.acceptFriendshipRequest({
           userId,
           currentUserId: decodedAccessToken.userId,
         });
       case FriendStatus.REJECTED:
-        return this.userService.rejectFriendshipRequest({
+        return this.userFriendService.rejectFriendshipRequest({
           userId,
           currentUserId: decodedAccessToken.userId,
         });
@@ -445,7 +449,7 @@ export class UserController {
     @Param('userId') userId: string,
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
   ) {
-    return this.userService.toggleBlockFriend({
+    return this.userFriendService.toggleBlockFriend({
       userId,
       currentUserId: decodedAccessToken.userId,
     });
@@ -521,7 +525,7 @@ export class UserController {
     @Param('userId') userId: string,
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
   ) {
-    return this.userService.removeFriend({
+    return this.userFriendService.removeFriend({
       userId,
       currentUserId: decodedAccessToken.userId,
     });

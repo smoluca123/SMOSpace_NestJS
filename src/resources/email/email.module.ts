@@ -4,10 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { EmailService } from './email.service';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
 
 @Module({
   imports: [
-    // ConfigModule.forRoot(),
+    RateLimiterModule,
     MailerModule.forRootAsync({
       useFactory: async (configService: ConfigService) => ({
         transport: {

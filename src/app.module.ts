@@ -24,6 +24,7 @@ import { HttpExceptionFilter } from 'src/filters/http-exception.filter';
 import { ResponseInterceptor } from 'src/interceptors/response.interceptor';
 import { ChatModule } from 'src/resources/chat/chat.module';
 import { LoggerModule } from 'src/libs/logger';
+import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -135,6 +136,7 @@ import { LoggerModule } from 'src/libs/logger';
     // }),
 
     ThrottlerModule.forRoot([{ ttl: 2000, limit: 100, name: 'default' }]),
+    RateLimiterModule,
     JwtModuleCustom,
     PrismaModule,
     AuthModule,

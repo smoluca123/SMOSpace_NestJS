@@ -67,7 +67,7 @@ export class PostCommentService {
 
       const MAX_COMMENT_LEVEL = 2;
 
-      const { content, replyToId } = data;
+      const { content, replyToId, mentionedUserIds } = data;
 
       const parentComment =
         replyToId &&
@@ -149,6 +149,31 @@ export class PostCommentService {
           recipientId: parentComment.authorId,
           senderData: createdComment.author,
         });
+      }
+
+      // Handle mention notifications
+      if (mentionedUserIds && mentionedUserIds.length > 0) {
+        // Filter out self-mentions and get unique user IDs
+        const uniqueMentionedUserIds = [
+          ...new Set(mentionedUserIds.filter((id) => id !== authorId)),
+        ];
+
+        // Create mention notifications for all mentioned users
+        const mentionPromises = uniqueMentionedUserIds.map((mentionedUserId) =>
+          this.notification.createCommentMentionNotification({
+            senderId: authorId,
+            recipientId: mentionedUserId,
+            postId,
+            commentId: createdComment.id,
+            senderData: {
+              username: createdComment.author.username,
+              fullName: createdComment.author.fullName,
+              avatar: createdComment.author.avatar,
+            } as any,
+          }),
+        );
+
+        await Promise.all(mentionPromises);
       }
 
       // Emit new comment to all connected clients
@@ -408,6 +433,11 @@ export class PostCommentService {
           commentId: commentExist.id,
         });
       }
+
+      // Delete all mention notifications related to this comment
+      await this.notification.deleteCommentMentionNotifications(
+        commentExist.id,
+      );
 
       return { deletedComment };
     } catch (error) {

@@ -39,3 +39,13 @@ export interface INotificationFriendRequestAcceptPayload
   extends INotificationPayload {
   friendId: string;
 }
+
+export interface INotificationPostMentionPayload extends INotificationPayload {
+  postId: string;
+}
+
+export interface INotificationCommentMentionPayload
+  extends INotificationPayload {
+  postId: string;
+  commentId: string;
+}
