@@ -34,6 +34,28 @@ export class CreatePostDto {
   @IsArray()
   @IsOptional()
   images: Express.Multer.File[];
+
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Array of user IDs that are mentioned in the post',
+    required: false,
+  })
+  @Transform(({ value }) => {
+    // Parse JSON string from FormData
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  @IsArray()
+  @IsUUID(4, { each: true })
+  @IsOptional()
+  mentionedUserIds?: string[];
 }
 
 export class UpdatePostDto {
@@ -50,6 +72,28 @@ export class UpdatePostDto {
   })
   @IsBoolean()
   isPrivate: boolean;
+
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Array of user IDs that are mentioned in the post',
+    required: false,
+  })
+  @Transform(({ value }) => {
+    // Parse JSON string from FormData
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  @IsArray()
+  @IsUUID(4, { each: true })
+  @IsOptional()
+  mentionedUserIds?: string[];
 }
 
 export class UpdatePostAsAdminDto extends UpdatePostDto {

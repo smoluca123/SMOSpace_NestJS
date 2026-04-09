@@ -4,23 +4,24 @@ import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { EmailService } from './email.service';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
 
 @Module({
   imports: [
-    // ConfigModule.forRoot(),
+    RateLimiterModule,
     MailerModule.forRootAsync({
       useFactory: async (configService: ConfigService) => ({
         transport: {
           host: configService.get('MAILER_HOST'),
           port: configService.get('MAILER_PORT'),
-          secure: true,
+          secure: configService.get('MAILER_SECURE') === 'true', // Read from env
           auth: {
             user: configService.get('MAILER_USER'),
             pass: configService.get('MAILER_PASS'),
           },
         },
         defaults: {
-          from: '"SMOTeam" <admin@support.smoteam.com>',
+          from: `"${configService.get('MAILER_FROM_NAME')}" <${configService.get('MAILER_FROM_ADDRESS')}>`,
         },
         template: {
           dir: join(__dirname, 'templates'),

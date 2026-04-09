@@ -12,6 +12,7 @@ import { FILE_VALIDATION } from 'src/constants/file.constants';
 import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { Roles } from 'src/decorators/roles.decorator';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
+import { RoleGuard } from 'src/guards/role.guard';
 import { FileUploadInterceptor } from 'src/interceptors/file-upload.interceptor';
 import { RolesLevel } from 'src/interfaces/interfaces.global';
 
@@ -43,6 +44,30 @@ export const getAllUsersDecorator = () =>
       description:
         'Optional current user ID (user ID) to check follow, friend status',
     }),
+  );
+
+export const adminGetAllUsersDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get all users with pagination (Manager access required)',
+      description:
+        'Retrieve a paginated list of users with optional search by keywords',
+    }),
+    ApiQueryLimitAndPage(),
+    ApiQuery({
+      name: 'keywords',
+      required: false,
+      description:
+        'Search users by username, email, full name, or display name',
+    }),
+    ApiQuery({
+      name: 'currentUserId',
+      required: false,
+      description:
+        'Optional current user ID (user ID) to check follow, friend status',
+    }),
+    UseGuards(RoleGuard),
+    Roles([RolesLevel.MANAGER]),
   );
 
 export const getInformationDecorator = () =>

@@ -34,103 +34,6 @@ export class PostCommentService {
     private readonly notification: NotificationService,
   ) {}
 
-  // async createPostComment({
-  //   authorId,
-  //   postId,
-  //   data,
-  // }: {
-  //   authorId: string;
-  //   postId: string;
-  //   data: CreatePostCommentDto;
-  // }): Promise<IResponseType<PostCommentDataType>> {
-  //   try {
-  //     if (!postId) {
-  //       throw new BadRequestException('Post id is required');
-  //     }
-
-  //     const MAX_COMMENT_LEVEL = 2;
-
-  //     const postExist = await this.prisma.post.findUnique({
-  //       where: {
-  //         id: postId,
-  //       },
-  //       select: {
-  //         id: true,
-  //       },
-  //     });
-  //     if (!postExist) {
-  //       throw new NotFoundException('Post not found');
-  //     }
-
-  //     const { content, replyToId } = data;
-  //     let parentComment: {
-  //       id: string;
-  //       level: number;
-  //       replyToId: string;
-  //     } | null = null;
-  //     if (replyToId) {
-  //       parentComment = await this.prisma.postComment.findUnique({
-  //         where: {
-  //           id: replyToId,
-  //         },
-  //         select: {
-  //           id: true,
-  //           level: true,
-  //           replyToId: true,
-  //         },
-  //       });
-  //       if (!parentComment) {
-  //         throw new NotFoundException('Parent comment not found');
-  //       }
-  //     }
-
-  //     const level = replyToId
-  //       ? parentComment.level < MAX_COMMENT_LEVEL
-  //         ? parentComment.level + 1
-  //         : parentComment.level
-  //       : 0;
-  //     const validReplyToId =
-  //       replyToId && level <= MAX_COMMENT_LEVEL
-  //         ? parentComment.replyToId
-  //         : null;
-
-  //     const [, createdComment] = await this.prisma.$transaction([
-  //       this.prisma.post.update({
-  //         where: { id: postId },
-  //         data: { commentCount: { increment: 1 } },
-  //         select: null,
-  //       }),
-  //       this.prisma.postComment.create({
-  //         data: {
-  //           content,
-  //           replyToId: validReplyToId,
-  //           postId,
-  //           authorId,
-  //           level,
-  //         },
-  //         select: postCommentDataSelect,
-  //       }),
-  //       ...(replyToId
-  //         ? [
-  //             this.prisma.postComment.update({
-  //               where: { id: replyToId },
-  //               data: { repliesCount: { increment: 1 } },
-  //               select: null,
-  //             }),
-  //           ]
-  //         : []),
-  //     ]);
-  //     return {
-  //       message: 'Comment created successfully',
-  //       data: createdComment,
-  //       statusCode: 201,
-  //       date: new Date(),
-  //     };
-  //   } catch (error) {
-  //     handleDefaultError(error);
-  //   }
-  // }
-
   async getCommentCount(): Promise<
     IBeforeTransformResponseType<{
       totalCommentsCount: number;
@@ -164,7 +67,7 @@ export class PostCommentService {
 
       const MAX_COMMENT_LEVEL = 2;
 
-      const { content, replyToId } = data;
+      const { content, replyToId, mentionedUserIds } = data;
 
       const parentComment =
         replyToId &&
@@ -193,10 +96,6 @@ export class PostCommentService {
           : level <= MAX_COMMENT_LEVEL && replyToId
         : null;
 
-      // replyToId && level === MAX_COMMENT_LEVEL
-      //   ? parentComment.replyToId
-      //   : null;
-
       const [, createdComment] = await this.prisma.$transaction([
         this.prisma.post.update({
           where: { id: postId },
@@ -224,8 +123,12 @@ export class PostCommentService {
           : []),
       ]);
 
-      // Create notification for post author
-      if (post.author.id !== parentComment?.authorId) {
+      // Create notification for post author (only for root comments, not replies)
+      // Also skip if the commenter is the post author themselves
+      const isRootComment = !parentComment;
+      const isNotPostAuthor = authorId !== post.author.id;
+
+      if (isRootComment && isNotPostAuthor) {
         await this.notification.createCommentNotification({
           postId,
           commentId: createdComment.id,
@@ -235,8 +138,9 @@ export class PostCommentService {
         });
       }
 
-      // Create notification for reply comment author
-      if (parentComment) {
+      // Create notification for parent comment author (for reply comments)
+      // Skip if replying to own comment
+      if (parentComment && authorId !== parentComment.authorId) {
         await this.notification.createReplyCommentNotification({
           postId,
           commentId: createdComment.id,
@@ -245,6 +149,31 @@ export class PostCommentService {
           recipientId: parentComment.authorId,
           senderData: createdComment.author,
         });
+      }
+
+      // Handle mention notifications
+      if (mentionedUserIds && mentionedUserIds.length > 0) {
+        // Filter out self-mentions and get unique user IDs
+        const uniqueMentionedUserIds = [
+          ...new Set(mentionedUserIds.filter((id) => id !== authorId)),
+        ];
+
+        // Create mention notifications for all mentioned users
+        const mentionPromises = uniqueMentionedUserIds.map((mentionedUserId) =>
+          this.notification.createCommentMentionNotification({
+            senderId: authorId,
+            recipientId: mentionedUserId,
+            postId,
+            commentId: createdComment.id,
+            senderData: {
+              username: createdComment.author.username,
+              fullName: createdComment.author.fullName,
+              avatar: createdComment.author.avatar,
+            } as any,
+          }),
+        );
+
+        await Promise.all(mentionPromises);
       }
 
       // Emit new comment to all connected clients
@@ -408,91 +337,6 @@ export class PostCommentService {
     };
   }
 
-  // async handleDeletePostComment({
-  //   commentId,
-  //   authorId,
-  // }: {
-  //   commentId: string;
-  //   authorId?: string;
-  // }) {
-  //   try {
-  //     if (!commentId) {
-  //       throw new BadRequestException('Comment id is required');
-  //     }
-
-  //     const commentExist = await this.prisma.postComment.findUnique({
-  //       where: {
-  //         id: commentId,
-  //       },
-  //       select: {
-  //         id: true,
-  //         postId: true,
-  //         repliesCount: true,
-  //         authorId: true,
-  //         post: {
-  //           select: {
-  //             commentCount: true,
-  //           },
-  //         },
-  //       },
-  //     });
-  //     if (!commentExist) {
-  //       throw new NotFoundException('Comment not found');
-  //     }
-
-  //     const {
-  //       postId,
-  //       post: { commentCount },
-  //     } = commentExist;
-
-  //     if (authorId) {
-  //       if (commentExist.authorId !== authorId) {
-  //         throw new ForbiddenException('This comment is not yours');
-  //       }
-  //     }
-  //     const [, deletedComment] = await this.prisma.$transaction([
-  //       this.prisma.post.update({
-  //         where: { id: postId },
-  //         data: {
-  //           commentCount: { decrement: commentCount > 0 ? 1 : 0 },
-  //         },
-  //         select: null,
-  //       }),
-  //       this.prisma.postComment.delete({
-  //         where: { id: commentId },
-  //         select: postCommentDataSelect,
-  //       }),
-  //     ]);
-  //     if (deletedComment.replyToId) {
-  //       const replyToComment = await this.prisma.postComment.findUnique({
-  //         where: { id: deletedComment.replyToId },
-  //         select: { id: true, repliesCount: true },
-  //       });
-  //       if (replyToComment) {
-  //         await this.prisma.postComment.update({
-  //           where: { id: deletedComment.replyToId },
-  //           data: {
-  //             repliesCount: {
-  //               decrement: replyToComment.repliesCount > 0 ? 1 : 0,
-  //             },
-  //           },
-  //           select: null,
-  //         });
-  //       }
-  //     }
-
-  //     return {
-  //       message: 'Comment deleted successfully',
-  //       data: deletedComment,
-  //       statusCode: 200,
-  //       date: new Date(),
-  //     };
-  //   } catch (error) {
-  //     console.log(error);
-  //     handleDefaultError(error);
-  //   }
-  // }
-
   async handleDeletePostComment({
     commentId,
     authorId,
@@ -515,6 +359,12 @@ export class PostCommentService {
           post: {
             select: {
               commentCount: true,
+              authorId: true,
+            },
+          },
+          // Get parent comment author to delete reply notification
+          replyTo: {
+            select: {
               authorId: true,
             },
           },
@@ -556,7 +406,13 @@ export class PostCommentService {
           : []),
       ]);
 
-      if (commentExist.post.authorId !== commentExist.authorId) {
+      // Delete notification for post author (only for root comments)
+      // Must match create logic: only root comments create notification for post author
+      const isRootComment = !commentExist.replyToId;
+      const isNotPostAuthor =
+        commentExist.post.authorId !== commentExist.authorId;
+
+      if (isRootComment && isNotPostAuthor) {
         await this.notification.deleteCommentNotification({
           recipientId: commentExist.post.authorId,
           senderId: commentExist.authorId,
@@ -564,6 +420,24 @@ export class PostCommentService {
           commentId: commentExist.id,
         });
       }
+
+      // Delete notification for parent comment author (for reply comments)
+      if (
+        commentExist.replyTo &&
+        commentExist.replyTo.authorId !== commentExist.authorId
+      ) {
+        await this.notification.deleteCommentNotification({
+          recipientId: commentExist.replyTo.authorId,
+          senderId: commentExist.authorId,
+          postId: commentExist.postId,
+          commentId: commentExist.id,
+        });
+      }
+
+      // Delete all mention notifications related to this comment
+      await this.notification.deleteCommentMentionNotifications(
+        commentExist.id,
+      );
 
       return { deletedComment };
     } catch (error) {

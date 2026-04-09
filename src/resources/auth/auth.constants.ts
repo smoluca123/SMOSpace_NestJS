@@ -1,4 +1,3 @@
 export const AUTH_CONSTANTS = {
   SESSION_EXPIRES: 1, // 1 days
-  DEFAULT_USER_TYPE_ID: '0c2d5733-69d0-4268-8a60-b39997f656b6',
 };

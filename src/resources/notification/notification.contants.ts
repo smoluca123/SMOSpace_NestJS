@@ -19,9 +19,17 @@ export const NOTIFICATION_MESSAGES = {
     title: 'New Friend Request',
     message: '{username} sent you a friend request',
   },
-  FRIEND_REQUEST_ACCEPT: {
+  FRIEND_ACCEPT: {
     title: 'Friend Request Accepted',
     message: '{username} accepted your friend request',
+  },
+  POST_MENTION: {
+    title: 'Mentioned in Post',
+    message: '{username} mentioned you in a post',
+  },
+  COMMENT_MENTION: {
+    title: 'Mentioned in Comment',
+    message: '{username} mentioned you in a comment',
   },
 };
 

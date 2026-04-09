@@ -23,6 +23,8 @@ import { S3Service } from 'src/services/aws/s3/s3.service';
 import { HttpExceptionFilter } from 'src/filters/http-exception.filter';
 import { ResponseInterceptor } from 'src/interceptors/response.interceptor';
 import { ChatModule } from 'src/resources/chat/chat.module';
+import { LoggerModule } from 'src/libs/logger';
+import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -67,17 +69,42 @@ import { ChatModule } from 'src/resources/chat/chat.module';
     //   }),
     // }),
 
+    // RedisModule.forRootAsync({
+    //   imports: [ConfigModule],
+    //   inject: [ConfigService],
+    //   useFactory: async (configService: ConfigService) => ({
+    //     config: {
+    //       host: configService.get('REDIS_HOST'),
+    //       port: configService.get('REDIS_PORT'),
+    //       password: configService.get('REDIS_PASSWORD'),
+    //       db: 0,
+    //     },
+    //   }),
+    // }),
     RedisModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        config: {
+      useFactory: (configService: ConfigService) => {
+        const baseConfig: any = {
           host: configService.get('REDIS_HOST'),
           port: configService.get('REDIS_PORT'),
           password: configService.get('REDIS_PASSWORD'),
+          username: configService.get('REDIS_USERNAME'),
           db: 0,
-        },
-      }),
+        };
+
+        // Cấu hình TLS với SNI nếu được bật
+        if (configService.get('REDIS_TLS_ENABLED')) {
+          baseConfig.tls = {
+            servername:
+              configService.get('REDIS_SNI') || configService.get('REDIS_HOST'),
+          };
+        }
+
+        return {
+          config: baseConfig,
+        };
+      },
     }),
 
     // CacheModule.registerAsync({
@@ -109,6 +136,7 @@ import { ChatModule } from 'src/resources/chat/chat.module';
     // }),
 
     ThrottlerModule.forRoot([{ ttl: 2000, limit: 100, name: 'default' }]),
+    RateLimiterModule,
     JwtModuleCustom,
     PrismaModule,
     AuthModule,
@@ -119,6 +147,7 @@ import { ChatModule } from 'src/resources/chat/chat.module';
     NotificationModule,
     S3Module,
     ChatModule,
+    LoggerModule,
   ],
   controllers: [AppController],
   providers: [
@@ -137,6 +166,7 @@ import { ChatModule } from 'src/resources/chat/chat.module';
       provide: APP_INTERCEPTOR,
       useClass: ResponseInterceptor,
     },
+    // LoggingInterceptor removed - nestjs-pino handles request logging automatically
     // {
     //   provide: APP_GUARD,
     //   useClass: AuthGuard('jwt'),

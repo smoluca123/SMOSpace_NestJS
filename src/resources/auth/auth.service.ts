@@ -163,8 +163,13 @@ export class AuthService {
           createdAt: new Date(),
           id: userId,
           userType: {
-            connect: {
-              id: AUTH_CONSTANTS.DEFAULT_USER_TYPE_ID,
+            connectOrCreate: {
+              where: {
+                typeName: 'USER',
+              },
+              create: {
+                typeName: 'USER',
+              },
             },
           },
           additionalInfo: {
@@ -296,6 +301,8 @@ export class AuthService {
       if (!oldAccessToken)
         throw new BadRequestException('Access token is required');
 
+      oldAccessToken = oldAccessToken.replace('Bearer ', '');
+
       // Get current timestamp
       const currentDate = new Date();
 
@@ -312,8 +319,11 @@ export class AuthService {
       });
 
       // Validate session
-      if (!checkSession || checkSession.userId !== userId)
+      if (!checkSession || checkSession.userId !== userId) {
+        console.log('Invalid session', checkSession, userId);
         throw new ForbiddenException('Invalid session');
+      }
+
       if (isPast(new Date(checkSession.expiresAt)))
         throw new ForbiddenException('Session expired');
 

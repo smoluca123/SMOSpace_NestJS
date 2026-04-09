@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreatePostCommentDto {
   @ApiProperty({ default: '' })
@@ -11,6 +17,16 @@ export class CreatePostCommentDto {
   @IsUUID()
   @IsOptional()
   replyToId?: string;
+
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Array of user IDs that are mentioned in the comment',
+  })
+  @IsArray()
+  @IsUUID(4, { each: true })
+  @IsOptional()
+  mentionedUserIds?: string[];
 }
 
 export class UpdatePostCommentDto {

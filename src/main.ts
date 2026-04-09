@@ -6,11 +6,17 @@ import * as cookieParser from 'cookie-parser';
 import configuration from 'src/configs/configuration';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { ResponseInterceptor } from './interceptors/response.interceptor';
+import { Logger } from 'nestjs-pino';
 
 const config = configuration();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true, // Buffer logs during app initialization
+  });
+
+  // Use Pino logger for all NestJS logs
+  app.useLogger(app.get(Logger));
 
   const configDocument = new DocumentBuilder()
     .setTitle('Social Media API')
@@ -41,11 +47,12 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new ResponseInterceptor());
 
-  await app.listen(config.SERVER_PORT, () => {
-    console.log(`Server is running on http://localhost:${config.SERVER_PORT}`);
-    console.log(
-      `Swagger API documentation is available at http://localhost:${config.SERVER_PORT}/swagger`,
-    );
-  });
+  await app.listen(config.SERVER_PORT);
+
+  const logger = app.get(Logger);
+  logger.log(`Server is running on http://localhost:${config.SERVER_PORT}`);
+  logger.log(
+    `Swagger API documentation is available at http://localhost:${config.SERVER_PORT}/swagger`,
+  );
 }
 bootstrap();
