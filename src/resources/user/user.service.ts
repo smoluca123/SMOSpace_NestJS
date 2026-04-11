@@ -328,29 +328,33 @@ export class UserService {
                 select: { followerId: true },
               }
             : false,
-          friends: {
-            where: {
-              OR: [{ userId: currentUserId }, { friendId: currentUserId }],
-            },
-            select: friendDataSelect,
-          },
         },
       });
 
       // Throw error if user not found
       if (!user) throw new NotFoundException('User not found');
 
+      // Query friend relationship separately to handle bidirectional relationship
+      let friendRelationship = null;
+      if (currentUserId) {
+        friendRelationship = await this.prisma.friend.findFirst({
+          where: {
+            OR: [
+              { userId: currentUserId, friendId: user.id },
+              { userId: user.id, friendId: currentUserId },
+            ],
+          },
+          select: friendDataSelect,
+        });
+      }
+
       // Extract followers data and prepare result
-      const { followers, friends, ...userResult } = user;
-      // const result =
-      //   followerId && followers?.length > 0
-      //     ? { ...userResult, isFollowedByUser: true }
-      //     : userResult;
+      const { followers, ...userResult } = user;
 
       const result = {
         ...userResult,
         isFollowedByUser: followers?.length > 0 || false,
-        friend: friends?.length > 0 ? friends[0] : null,
+        friend: friendRelationship,
       };
 
       // Return success response

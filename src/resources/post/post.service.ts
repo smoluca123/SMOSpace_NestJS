@@ -234,28 +234,6 @@ export class PostService {
           },
         },
       });
-      // if (!postId) {
-      //   throw new BadRequestException({
-      //     message: 'Post id is required',
-      //     statusCode: 400,
-      //     date: new Date(),
-      //   });
-      // }
-
-      // const post = await this.prisma.post.findUnique({
-      //   where: { id: postId },
-      //   select: {
-      //     ...postDataSelect,
-      //     likes: {
-      //       where: {
-      //         userId: likeUserId || '',
-      //       },
-      //       select: {
-      //         userId: true,
-      //       },
-      //     },
-      //   },
-      // });
 
       if (!post) {
         throw new NotFoundException({
@@ -263,6 +241,17 @@ export class PostService {
           statusCode: 404,
           date: new Date(),
         });
+      }
+
+      // Check if post is private and user is not the owner
+      if (post.isPrivate) {
+        if (!likeUserId || post.author.id !== likeUserId) {
+          throw new ForbiddenException({
+            message: 'You do not have permission to view this private post',
+            statusCode: 403,
+            date: new Date(),
+          });
+        }
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
