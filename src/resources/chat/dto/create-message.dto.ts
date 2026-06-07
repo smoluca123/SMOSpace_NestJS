@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsArray } from 'class-validator';
 import { MessageType } from '@prisma/client';
 
 export class CreateFirstMessageDto {
@@ -28,4 +28,13 @@ export class CreateMessageDto {
   @IsString()
   @IsOptional()
   replyToId?: string;
+}
+
+export class CreateGroupDto {
+  @IsString()
+  name: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  participantIds: string[];
 }

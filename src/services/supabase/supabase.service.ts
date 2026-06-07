@@ -47,7 +47,7 @@ export class SupabaseService {
 
       return uploadResult;
     } catch (error) {
-      throw new Error(`Lỗi khi upload file: ${error.message}`);
+      throw new Error(`Failed to upload file: ${error.message}`);
     }
   }
 
@@ -74,7 +74,7 @@ export class SupabaseService {
         fileName: sanitizedFileName,
       };
     } catch (error) {
-      throw new Error(`Lỗi khi upload file: ${error.message}`);
+      throw new Error(`Failed to upload file: ${error.message}`);
     }
   }
 }

@@ -7,6 +7,10 @@ export const NOTIFICATION_MESSAGES = {
     title: 'New Like',
     message: '{username} liked your post',
   },
+  LIKE_COMMENT: {
+    title: 'New Like',
+    message: '{username} liked your comment',
+  },
   COMMENT_POST: {
     title: 'New Comment',
     message: '{username} commented on your post',

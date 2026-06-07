@@ -30,6 +30,11 @@ export interface INotificationLikePayload extends INotificationPayload {
   postId: string;
 }
 
+export interface INotificationLikeCommentPayload extends INotificationPayload {
+  postId: string;
+  commentId: string;
+}
+
 export interface INotificationFriendRequestPayload
   extends INotificationPayload {
   friendId: string;

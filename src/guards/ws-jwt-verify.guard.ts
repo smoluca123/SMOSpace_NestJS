@@ -13,14 +13,14 @@ export class WsJwtVerifyGuard implements CanActivate {
     private readonly prismaService: PrismaService,
     private readonly jwt: JwtService,
   ) {
-    // Tái sử dụng logic từ JwtTokenVerifyGuard
+    // Reuse the logic from JwtTokenVerifyGuard
     this.jwtTokenVerifyGuard = new JwtTokenVerifyGuard(prismaService, jwt);
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client = context.switchToWs().getClient<Socket>();
     try {
-      // Tạo mock request object để tái sử dụng logic cũ
+      // Build a mock request object to reuse the existing logic
       const mockRequest = {
         headers: {
           accesstoken:
@@ -29,25 +29,25 @@ export class WsJwtVerifyGuard implements CanActivate {
         },
       };
 
-      // Tạo mock context để pass vào guard cũ
+      // Build a mock context to pass into the existing guard
       const mockContext = {
         switchToHttp: () => ({
           getRequest: () => mockRequest,
         }),
       } as ExecutionContext;
 
-      // Sử dụng logic từ guard cũ
+      // Reuse the logic from the existing guard
       const result = await this.jwtTokenVerifyGuard.canActivate(mockContext);
 
       if (result) {
-        // Lưu user data vào socket instance để sử dụng sau này
+        // Store user data on the socket instance for later use
         client.data.user = mockRequest['userData'];
         client.data.decodedToken = mockRequest['decodedAccessToken'];
         return true;
       }
       return false;
     } catch (error) {
-      // Convert HTTP exceptions sang WS exceptions
+      // Convert HTTP exceptions to WS exceptions
       throw new WsException(error.message || 'Unauthorized');
     }
   }

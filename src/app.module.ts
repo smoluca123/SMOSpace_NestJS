@@ -23,6 +23,7 @@ import { S3Service } from 'src/services/aws/s3/s3.service';
 import { HttpExceptionFilter } from 'src/filters/http-exception.filter';
 import { ResponseInterceptor } from 'src/interceptors/response.interceptor';
 import { ChatModule } from 'src/resources/chat/chat.module';
+import { UserGatewayModule } from 'src/resources/gateways/user/user.module';
 import { LoggerModule } from 'src/libs/logger';
 import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
 @Module({
@@ -144,6 +145,7 @@ import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
     PostCommentModule,
     PostModule,
     // AppGatewayModule,
+    UserGatewayModule,
     NotificationModule,
     S3Module,
     ChatModule,

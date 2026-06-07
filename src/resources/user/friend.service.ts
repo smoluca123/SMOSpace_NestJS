@@ -335,6 +335,16 @@ export class FriendService {
         (rel) => rel.user.id === user.id && rel.friend.id === currentUser.id,
       );
 
+      // Block guard: no friend requests are allowed while a block is in place.
+      const blockedRelationship = existingRelationships.find(
+        (rel) => rel.status === FriendStatus.BLOCKED,
+      );
+      if (blockedRelationship) {
+        throw new BadRequestException(
+          'Cannot send a friend request to a blocked user',
+        );
+      }
+
       // ==================== SCENARIO 1: Cancel my request ====================
       if (myRequest && !theirRequest) {
         await this.prisma.friend.delete({
@@ -355,7 +365,9 @@ export class FriendService {
 
         return {
           message: 'Friendship request cancelled successfully',
-          data: myRequest,
+          // Mark as REJECTED so clients treat the relationship as "none"
+          // (the row was deleted; its in-memory status is still PENDING).
+          data: { ...myRequest, status: FriendStatus.REJECTED },
           statusCode: 200,
           date: new Date(),
         };
@@ -364,20 +376,19 @@ export class FriendService {
       // ==================== SCENARIO 2: Accept their request ====================
       if (theirRequest && !myRequest) {
         // Establish 2-way follow relationship
-        await Promise.all([
-          this.userService.followUser({
-            followerUserId: currentUser.id,
-            userId: user.id,
-            skipNotification: true,
-          }),
-          // Note: user already followed currentUser when sending request
-          // But we ensure it exists in case of data inconsistency
-          this.userService.followUser({
-            followerUserId: user.id,
-            userId: currentUser.id,
-            skipNotification: true,
-          }),
-        ]);
+        // Sequential to avoid deadlock (each follow updates both user rows).
+        await this.userService.followUser({
+          followerUserId: currentUser.id,
+          userId: user.id,
+          skipNotification: true,
+        });
+        // Note: user already followed currentUser when sending request
+        // But we ensure it exists in case of data inconsistency
+        await this.userService.followUser({
+          followerUserId: user.id,
+          userId: currentUser.id,
+          skipNotification: true,
+        });
 
         // Update request to accepted status
         const [, , acceptedRequest] = await this.prisma.$transaction([
@@ -402,6 +413,14 @@ export class FriendService {
           friendId: currentUser.id,
         });
 
+        // Notify the original sender that their request was accepted (realtime)
+        await this.notificationService.createFriendAcceptNotification({
+          recipientId: user.id,
+          senderId: currentUser.id,
+          senderData: currentUser,
+          friendId: currentUser.id,
+        });
+
         return {
           message: 'Friendship request accepted successfully',
           data: acceptedRequest,
@@ -415,18 +434,17 @@ export class FriendService {
         // Both users sent requests to each other → Automatic mutual friendship!
 
         // Establish 2-way follow relationship (if not already done)
-        await Promise.all([
-          this.userService.followUser({
-            followerUserId: currentUser.id,
-            userId: user.id,
-            skipNotification: true,
-          }),
-          this.userService.followUser({
-            followerUserId: user.id,
-            userId: currentUser.id,
-            skipNotification: true,
-          }),
-        ]);
+        // Sequential to avoid deadlock (each follow updates both user rows).
+        await this.userService.followUser({
+          followerUserId: currentUser.id,
+          userId: user.id,
+          skipNotification: true,
+        });
+        await this.userService.followUser({
+          followerUserId: user.id,
+          userId: currentUser.id,
+          skipNotification: true,
+        });
 
         // Keep one relationship, delete the other, update to ACCEPTED
         const [, , acceptedRequest] = await this.prisma.$transaction([
@@ -462,6 +480,14 @@ export class FriendService {
             friendId: currentUser.id,
           }),
         ]);
+
+        // Notify the other user that the mutual friendship was established (realtime)
+        await this.notificationService.createFriendAcceptNotification({
+          recipientId: user.id,
+          senderId: currentUser.id,
+          senderData: currentUser,
+          friendId: currentUser.id,
+        });
 
         return {
           message: 'Mutual friendship established successfully',
@@ -528,9 +554,7 @@ export class FriendService {
 
       const friend = await this.userService.validateUser({
         userId: currentUserId,
-        selectData: {
-          id: true,
-        },
+        selectData: userDataSelect,
       });
 
       const checkFriendshipRequestReceived = await this.prisma.friend.findFirst(
@@ -561,19 +585,18 @@ export class FriendService {
       // Establish 2-way follow relationship
       // Note: user (sender) already followed currentUser when sending the request
       // Now currentUser follows back to complete bidirectional friendship
-      await Promise.all([
-        this.userService.followUser({
-          followerUserId: currentUserId,
-          userId,
-          skipNotification: true,
-        }),
-        // Ensure sender's follow still exists (for data consistency)
-        this.userService.followUser({
-          followerUserId: userId,
-          userId: currentUserId,
-          skipNotification: true,
-        }),
-      ]);
+      // Sequential to avoid deadlock (each follow updates both user rows).
+      await this.userService.followUser({
+        followerUserId: currentUserId,
+        userId,
+        skipNotification: true,
+      });
+      // Ensure sender's follow still exists (for data consistency)
+      await this.userService.followUser({
+        followerUserId: userId,
+        userId: currentUserId,
+        skipNotification: true,
+      });
 
       const [, , acceptedFriendshipRequest] = await this.prisma.$transaction([
         this.prisma.user.update({
@@ -599,6 +622,14 @@ export class FriendService {
       await this.notificationService.deleteFriendRequestNotifications({
         userId: userId,
         friendId: currentUserId,
+      });
+
+      // Notify the original sender that their request was accepted (realtime)
+      await this.notificationService.createFriendAcceptNotification({
+        recipientId: user.id,
+        senderId: friend.id,
+        senderData: friend,
+        friendId: friend.id,
       });
 
       return {
@@ -695,18 +726,17 @@ export class FriendService {
         throw new BadRequestException('Friend not found');
       }
 
-      // Remove 2-way follow relationship
-      const unfollowPromises = [
-        this.userService.unfollowUser({
-          followerUserId: currentUserId,
-          userId: user.id,
-        }),
-        this.userService.unfollowUser({
-          followerUserId: user.id,
-          userId: currentUserId,
-        }),
-      ];
-      await Promise.all(unfollowPromises);
+      // Remove 2-way follow relationship.
+      // Run sequentially to avoid a deadlock: each unfollow opens a transaction
+      // updating both user rows, so concurrent calls lock them in opposite order.
+      await this.userService.unfollowUser({
+        followerUserId: currentUserId,
+        userId: user.id,
+      });
+      await this.userService.unfollowUser({
+        followerUserId: user.id,
+        userId: currentUserId,
+      });
 
       const [, removedFriend] = await this.prisma.$transaction([
         this.prisma.user.updateMany({
@@ -775,6 +805,11 @@ export class FriendService {
       });
 
       if (checkFriend?.status === FriendStatus.BLOCKED) {
+        // Only the user who created the block may lift it.
+        if (checkFriend.userId !== currentUser.id) {
+          throw new BadRequestException('You have been blocked by this user');
+        }
+
         const blockedFriend = await this.prisma.friend.delete({
           where: {
             id: checkFriend.id,
@@ -794,19 +829,16 @@ export class FriendService {
 
       const isFriend = checkFriend?.status === FriendStatus.ACCEPTED;
 
-      if (isFriend) {
-        await this.prisma.$transaction([
-          // Delete friendship
+      // Clean up any existing (non-blocked) relationship before blocking.
+      // This covers pending requests, rejected records and active friendships,
+      // and prevents a unique-constraint clash when we create the BLOCKED row.
+      if (checkFriend) {
+        await this.prisma.friend.delete({
+          where: { id: checkFriend.id },
+        });
 
-          this.prisma.friend.delete({
-            where: {
-              id: checkFriend.id,
-            },
-          }),
-
-          // Decrement friend count of current user
-
-          this.prisma.user.updateMany({
+        if (isFriend) {
+          await this.prisma.user.updateMany({
             where: {
               id: {
                 in: [user.id, currentUser.id],
@@ -815,9 +847,35 @@ export class FriendService {
             data: {
               friendCount: { decrement: 1 },
             },
+          });
+        }
+
+        // Drop friend-request notifications between the two users
+        await Promise.all([
+          this.notificationService.deleteFriendRequestNotifications({
+            userId: currentUser.id,
+            friendId: user.id,
+          }),
+          this.notificationService.deleteFriendRequestNotifications({
+            userId: user.id,
+            friendId: currentUser.id,
           }),
         ]);
       }
+
+      // Tear down the follow relationship in both directions so a blocked
+      // user can no longer appear in feeds/followers. unfollowUser is a no-op
+      // when the relationship doesn't exist, so this is safe either way.
+      // NOTE: run sequentially - each call opens a transaction touching both
+      // user rows, so running them concurrently deadlocks (lock ordering).
+      await this.userService.unfollowUser({
+        followerUserId: currentUser.id,
+        userId: user.id,
+      });
+      await this.userService.unfollowUser({
+        followerUserId: user.id,
+        userId: currentUser.id,
+      });
 
       // Create blocked friendship
       const newBlockedFriend = await this.prisma.friend.create({

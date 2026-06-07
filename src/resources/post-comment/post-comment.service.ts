@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, ReactionType } from '@prisma/client';
 import { handleDefaultError } from 'src/global/functions.global';
 import {
   IBeforeTransformResponseType,
@@ -14,6 +14,12 @@ import {
 import {
   postCommentDataSelect,
   PostCommentDataType,
+  PostCommentDataTypeWithLikeStatus,
+  PostCommentLikeDataType,
+  PostCommentReactionCounts,
+  postDataSelect,
+  PostDataType,
+  userDataSelect,
 } from 'src/libs/prisma-types';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CommentGateway } from 'src/resources/gateways/comment/comment.gateway';
@@ -47,6 +53,259 @@ export class PostCommentService {
         data: {
           totalCommentsCount: count,
         },
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  // ==================== REACTION HELPERS ====================
+
+  private static readonly REACTION_TYPES: ReactionType[] = [
+    'LIKE',
+    'LOVE',
+    'HAHA',
+    'WOW',
+    'SAD',
+    'ANGRY',
+  ];
+
+  /** Empty per-type reaction counter, all entries set to 0. */
+  private buildEmptyReactionCounts(): PostCommentReactionCounts {
+    return PostCommentService.REACTION_TYPES.reduce((acc, type) => {
+      acc[type] = 0;
+      return acc;
+    }, {} as PostCommentReactionCounts);
+  }
+
+  /**
+   * Aggregate reaction counts (per `ReactionType`) for the given comments in a
+   * single grouped query - avoids N+1 when listing comment threads.
+   * Returns a map: `commentId -> PostCommentReactionCounts`.
+   */
+  private async getReactionCountsByCommentIds(
+    commentIds: string[],
+  ): Promise<Map<string, PostCommentReactionCounts>> {
+    const result = new Map<string, PostCommentReactionCounts>();
+    if (commentIds.length === 0) return result;
+
+    const groups = await this.prisma.postCommentLike.groupBy({
+      by: ['commentId', 'type'],
+      where: { commentId: { in: commentIds } },
+      _count: { _all: true },
+    });
+
+    for (const { commentId, type, _count } of groups) {
+      const counts = result.get(commentId) ?? this.buildEmptyReactionCounts();
+      counts[type] = _count._all;
+      result.set(commentId, counts);
+    }
+
+    return result;
+  }
+
+  /** Convenience for a single comment id. */
+  private async getReactionCountsByCommentId(
+    commentId: string,
+  ): Promise<PostCommentReactionCounts> {
+    const map = await this.getReactionCountsByCommentIds([commentId]);
+    return map.get(commentId) ?? this.buildEmptyReactionCounts();
+  }
+
+  /**
+   * Toggle / change a reaction on a comment for the current user.
+   *
+   * Behavior matrix mirrors `PostService.likePost`:
+   *   - no existing reaction              -> create new with `type`, +1 likeCount
+   *   - existing reaction same as `type`  -> remove (toggle off), -1 likeCount
+   *   - existing reaction different type  -> swap to `type`, likeCount unchanged
+   */
+  async likeComment({
+    commentId,
+    userId,
+    type = 'LIKE',
+  }: {
+    commentId: string;
+    userId: string;
+    type?: ReactionType;
+  }): Promise<IResponseType<PostCommentDataTypeWithLikeStatus>> {
+    try {
+      if (!commentId) {
+        throw new BadRequestException('Comment id is required');
+      }
+
+      const comment = await this.prisma.postComment.findUnique({
+        where: { id: commentId },
+        select: {
+          ...postCommentDataSelect,
+          likes: {
+            where: { userId },
+            select: {
+              id: true,
+              type: true,
+            },
+          },
+        },
+      });
+
+      if (!comment) {
+        throw new NotFoundException('Comment not found');
+      }
+
+      const existing = comment.likes[0];
+      const isSameTypeToggle = existing?.type === type;
+      const isSwap = existing && existing.type !== type;
+      const isAdd = !existing;
+
+      // 1) Apply reaction change
+      if (isAdd) {
+        await this.prisma.postCommentLike.create({
+          data: {
+            commentId,
+            userId,
+            type,
+          },
+        });
+      } else if (isSameTypeToggle) {
+        await this.prisma.postCommentLike.deleteMany({
+          where: { commentId, userId },
+        });
+      } else if (isSwap) {
+        await this.prisma.postCommentLike.updateMany({
+          where: { commentId, userId },
+          data: { type },
+        });
+      }
+
+      // 2) Adjust the comment's total reaction count (only on add/remove)
+      const updatedComment = await this.prisma.postComment.update({
+        where: { id: commentId },
+        data: isAdd
+          ? { likeCount: { increment: 1 } }
+          : isSameTypeToggle
+            ? { likeCount: { decrement: 1 } }
+            : {},
+        select: postCommentDataSelect,
+      });
+
+      // 3) Notification side-effect: create on add, delete on toggle-off, no-op on swap
+      if (isAdd && comment.author.id !== userId) {
+        const senderData = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: userDataSelect,
+        });
+
+        if (senderData) {
+          await this.notification.createLikeCommentNotification({
+            recipientId: comment.author.id,
+            senderId: userId,
+            postId: comment.post.id,
+            commentId,
+            senderData,
+          });
+        }
+      } else if (isSameTypeToggle) {
+        await this.notification.deleteLikeCommentNotification({
+          recipientId: comment.author.id,
+          senderId: userId,
+          postId: comment.post.id,
+          commentId,
+        });
+      }
+
+      const reactionCounts = await this.getReactionCountsByCommentId(commentId);
+      const myReaction: ReactionType | null = isSameTypeToggle ? null : type;
+
+      return {
+        message: 'Comment reaction updated successfully',
+        data: {
+          ...updatedComment,
+          isLiked: !!myReaction,
+          myReaction,
+          reactionCounts,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async getCommentLikes({
+    commentId,
+    page,
+    limit,
+    userId,
+    type,
+  }: {
+    commentId: string;
+    page: number;
+    limit: number;
+    userId?: string;
+    type?: ReactionType;
+  }): Promise<
+    IPaginationResponseType<PostCommentLikeDataType> & {
+      data: { comment: PostCommentDataType };
+    }
+  > {
+    try {
+      if (!commentId) {
+        throw new BadRequestException('Comment id is required');
+      }
+
+      const comment = await this.prisma.postComment.findUnique({
+        where: { id: commentId },
+        select: postCommentDataSelect,
+      });
+      if (!comment) {
+        throw new NotFoundException('Comment not found');
+      }
+
+      const whereQuery: Prisma.PostCommentLikeWhereInput = {
+        commentId,
+        ...(userId ? { userId } : {}),
+        ...(type ? { type } : {}),
+      };
+
+      const [likes, totalCount] = await this.prisma.$transaction([
+        this.prisma.postCommentLike.findMany({
+          where: whereQuery,
+          take: limit,
+          skip: (page - 1) * limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            type: true,
+            createdAt: true,
+            user: {
+              select: userDataSelect,
+            },
+          },
+        }),
+        this.prisma.postCommentLike.count({
+          where: whereQuery,
+        }),
+      ]);
+
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page * limit < totalCount;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      return {
+        message: 'Comment likes fetched successfully',
+        data: {
+          comment,
+          items: likes,
+          currentPage: page,
+          totalPage,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          pageSize: limit,
+        },
+        statusCode: 200,
+        date: new Date(),
       };
     } catch (error) {
       handleDefaultError(error);
@@ -195,12 +454,14 @@ export class PostCommentService {
     page = 1,
     limit = 10,
     replyTo,
+    likeUserId,
   }: {
     postId: string;
     page: number;
     limit: number;
     replyTo: string;
-  }): Promise<IPaginationResponseType<PostCommentDataType>> {
+    likeUserId?: string;
+  }): Promise<IPaginationResponseType<PostCommentDataTypeWithLikeStatus>> {
     try {
       if (!postId) {
         throw new BadRequestException('Post id is required');
@@ -229,12 +490,38 @@ export class PostCommentService {
           orderBy: { createdAt: 'asc' },
           skip: (page - 1) * limit,
           take: limit,
-          select: postCommentDataSelect,
+          select: {
+            ...postCommentDataSelect,
+            likes: {
+              where: {
+                userId: likeUserId || '',
+              },
+              select: {
+                userId: true,
+                type: true,
+              },
+            },
+          },
         }),
         this.prisma.postComment.count({
           where: whereQuery,
         }),
       ]);
+
+      const reactionCountsByComment = await this.getReactionCountsByCommentIds(
+        comments.map((c) => c.id),
+      );
+
+      const items: PostCommentDataTypeWithLikeStatus[] = comments.map(
+        ({ likes, ...comment }) => ({
+          ...comment,
+          isLiked: likes.length > 0,
+          myReaction: likes[0]?.type ?? null,
+          reactionCounts:
+            reactionCountsByComment.get(comment.id) ??
+            this.buildEmptyReactionCounts(),
+        }),
+      );
 
       const totalPage = Math.ceil(totalCount / limit);
       const hasNextPage = page * limit < totalCount;
@@ -249,7 +536,7 @@ export class PostCommentService {
           totalCount,
           hasNextPage,
           hasPreviousPage,
-          items: comments,
+          items,
         },
         statusCode: 200,
         date: new Date(),

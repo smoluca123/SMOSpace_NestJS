@@ -150,5 +150,5 @@ export function getActionTextByType(type: NotificationType_Type): string {
     [NotificationType_Type.COMMENT_MENTION]: 'mentioned you in a comment',
   };
 
-  return actionTexts[type] ?? 'đã tương tác với bạn';
+  return actionTexts[type] ?? 'interacted with you';
 }

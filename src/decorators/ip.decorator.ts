@@ -13,18 +13,18 @@ export const IpAddress = createParamDecorator(
       request.socket.remoteAddress ||
       request.ip;
 
-    // Xử lý bỏ http://, https:// và port
+    // Strip http://, https:// and the port
     ip = ip
-      ?.replace(/^https?:\/\//, '') // Bỏ http:// hoặc https://
-      .replace(/:\d+$/, '') // Bỏ port number
-      .replace(/\/+$/, ''); // Bỏ dấu / ở cuối nếu có
+      ?.replace(/^https?:\/\//, '') // Remove http:// or https://
+      .replace(/:\d+$/, '') // Remove the port number
+      .replace(/\/+$/, ''); // Remove a trailing slash if present
 
-    // Xử lý địa chỉ IPv6 localhost
+    // Handle IPv6 localhost
     if (ip === '::1' || ip === '::ffff:127.0.0.1') {
       return '127.0.0.1';
     }
 
-    // Xử lý địa chỉ IPv6 thành IPv4
+    // Convert IPv6-mapped address to IPv4
     if (ip?.startsWith('::ffff:')) {
       return ip.substring(7);
     }

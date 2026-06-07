@@ -85,3 +85,37 @@ export const getCommentCountDecorator = () =>
       summary: 'Get comment count',
     }),
   );
+
+export const likeCommentDecorator = () =>
+  applyDecorators(
+    UseGuards(JwtTokenVerifyGuard),
+    ApiOperation({
+      summary: 'Toggle / change comment reaction',
+      description:
+        'Toggle the current user reaction on a comment. Pass `type` in the body to react with a specific emoji (LOVE, HAHA, ...). Re-sending the same type toggles the reaction off.',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+  );
+
+export const getCommentLikesDecorator = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get comment likes',
+      description:
+        'Retrieve a paginated list of users who reacted to the specified comment. Optional `type` filters by reaction.',
+    }),
+    ApiQueryLimitAndPage(),
+    ApiQuery({
+      name: 'userId',
+      required: false,
+      description: 'Filter to check if the comment is liked by this user',
+    }),
+    ApiQuery({
+      name: 'type',
+      required: false,
+      description: 'Filter likes by reaction type (LIKE, LOVE, HAHA, ...)',
+    }),
+  );

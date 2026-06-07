@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsIn,
   IsNotEmpty,
   IsNumber,
@@ -13,6 +14,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UUID } from 'crypto';
+import { ReactionType } from '@prisma/client';
 
 export class CreatePostDto {
   @ApiProperty({ default: '', required: true })
@@ -150,4 +152,22 @@ export class GenerateImagesDto {
   @Max(60)
   @IsNotEmpty()
   steps: number;
+}
+
+/**
+ * Body for `POST /post/like/:postId`. The `type` field is optional to keep
+ * backward compatibility with clients that just want a "Like" toggle - it
+ * defaults to LIKE on the server.
+ */
+export class ReactPostDto {
+  @ApiProperty({
+    enum: ReactionType,
+    required: false,
+    default: ReactionType.LIKE,
+    description:
+      'Reaction type. Omit (or pass LIKE) for the classic Like behavior.',
+  })
+  @IsOptional()
+  @IsEnum(ReactionType)
+  type?: ReactionType;
 }
