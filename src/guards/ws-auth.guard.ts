@@ -5,11 +5,11 @@ import { WsException } from '@nestjs/websockets';
 @Injectable()
 export class WsJwtGuard extends AuthGuard('jwt') {
   getRequest(context: ExecutionContext) {
-    // Lấy client socket từ context
+    // Get the client socket from the context
     const wsContext = context.switchToWs();
     const client = wsContext.getClient();
 
-    // Tạo một request object giả lập để JWT strategy có thể xử lý
+    // Build a fake request object so the JWT strategy can process it
     const authToken = client.handshake.headers.authorization;
 
     return {

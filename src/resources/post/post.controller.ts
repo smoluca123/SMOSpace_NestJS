@@ -16,6 +16,7 @@ import {
   CreatePostDto,
   DeletePostsDto,
   GenerateImagesDto,
+  ReactPostDto,
   UpdatePostAsAdminDto,
   UpdatePostDto,
 } from 'src/resources/post/dto/post.dto';
@@ -48,6 +49,7 @@ import { GeneratePostDto } from 'src/resources/post/dto/ai.dto';
 import { normalizePaginationParams } from 'src/utils/utils';
 import { AuthGuard } from '@nestjs/passport';
 import { RoleGuard } from 'src/guards/role.guard';
+import { ReactionType } from '@prisma/client';
 
 @ApiTags('Post Management')
 @ApiBearerAuth()
@@ -117,6 +119,25 @@ export class PostController {
     return this.postService.getTrendingTopics();
   }
 
+  @Get('/bookmarks')
+  @getMyPostsDecorator()
+  getMyBookmarks(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+
+    return this.postService.getMyBookmarks({
+      userId: decodedAccessToken.userId,
+      limit,
+      page,
+    });
+  }
+
   @Get('/admin/get-post')
   @getPostsAdminDecorator()
   getPostsAdmin(
@@ -166,12 +187,13 @@ export class PostController {
     @Query('page') _page: string,
     @Query('limit') _limit: string,
     @Query('userId') userId?: string,
+    @Query('type') type?: ReactionType,
   ) {
     const { limit, page } = normalizePaginationParams({
       limit: +_limit,
       page: +_page,
     });
-    return this.postService.getLikesPost({ postId, limit, page, userId });
+    return this.postService.getLikesPost({ postId, limit, page, userId, type });
   }
 
   @Get(':postId')
@@ -242,10 +264,24 @@ export class PostController {
   likePost(
     @Param('postId') postId: string,
     @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Body() body?: ReactPostDto,
   ) {
     return this.postService.likePost({
       postId,
       decodedAccessToken,
+      type: body?.type,
+    });
+  }
+
+  @Post('/bookmark/:postId')
+  @likePostDecorator()
+  toggleBookmark(
+    @Param('postId') postId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+  ) {
+    return this.postService.toggleBookmark({
+      postId,
+      userId: decodedAccessToken.userId,
     });
   }
 

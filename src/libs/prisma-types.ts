@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import type { ReactionType } from '@prisma/client';
 
 export const userTypeDataSelect = {
   id: true,
@@ -121,6 +122,7 @@ export const postDataInclude = {
 
 export const postLikeDataSelect = {
   id: true,
+  type: true,
   // userId: true,
   // postId: true,
   createdAt: true,
@@ -141,8 +143,17 @@ export type PostDataTypeWithLikes = PostDataType & {
   likes: PostLikeDataType[];
 };
 
+/**
+ * Per-reaction-type counters for a post. Indexed by `ReactionType` so the UI
+ * can render emoji breakdowns. The key set must match the Prisma enum.
+ */
+export type PostReactionCounts = Record<ReactionType, number>;
+
 export type PostDataTypeWithLikeStatus = PostDataType & {
   isLiked: boolean;
+  myReaction: ReactionType | null;
+  reactionCounts: PostReactionCounts;
+  isBookmarked?: boolean;
 };
 
 export type PostLikeDataType = Prisma.PostLikeGetPayload<{
@@ -199,6 +210,7 @@ export const postCommentDataSelect = {
   createdAt: true,
   updatedAt: true,
   repliesCount: true,
+  likeCount: true,
   replyToId: true,
   post: {
     select: postDataSelect,
@@ -211,6 +223,30 @@ export const postCommentDataSelect = {
 export type PostCommentDataType = Prisma.PostCommentGetPayload<{
   select: typeof postCommentDataSelect;
 }>;
+
+export const postCommentLikeDataSelect = {
+  id: true,
+  type: true,
+  createdAt: true,
+  user: {
+    select: userDataSelect,
+  },
+} satisfies Prisma.PostCommentLikeSelect;
+
+export type PostCommentLikeDataType = Prisma.PostCommentLikeGetPayload<{
+  select: typeof postCommentLikeDataSelect;
+}>;
+
+/**
+ * Per-reaction-type counters for a comment. Mirrors `PostReactionCounts`.
+ */
+export type PostCommentReactionCounts = Record<ReactionType, number>;
+
+export type PostCommentDataTypeWithLikeStatus = PostCommentDataType & {
+  isLiked: boolean;
+  myReaction: ReactionType | null;
+  reactionCounts: PostCommentReactionCounts;
+};
 
 export const notificationDataSelect = {
   id: true,
@@ -240,6 +276,9 @@ export type NotificationDataType = Prisma.NotificationGetPayload<{
 export const friendDataSelect = {
   id: true,
   status: true,
+  userId: true,
+  friendId: true,
+  isRequestedByMe: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.FriendSelect;
@@ -269,6 +308,8 @@ export type FriendDataWithUserAndFriend = Prisma.FriendGetPayload<{
 
 export const chatParticipantDataSelect = {
   id: true,
+  userId: true,
+  isMuted: true,
   leftAt: true,
   joinedAt: true,
   user: {
@@ -296,6 +337,7 @@ export const chatRoomDataSelect = {
     select: {
       id: true,
       content: true,
+      type: true,
       createdAt: true,
       updatedAt: true,
       sender: {

@@ -12,9 +12,11 @@ import {
 import { PostCommentService } from './post-comment.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { ReactionType } from '@prisma/client';
 import { RoleGuard } from 'src/guards/role.guard';
 import {
   CreatePostCommentDto,
+  ReactCommentDto,
   UpdatePostCommentDto,
 } from 'src/resources/post-comment/dto/post-copmment.dto';
 import {
@@ -22,7 +24,9 @@ import {
   deletePostCommentByAdminDecorator,
   deletePostCommentDecorator,
   getCommentCountDecorator,
+  getCommentLikesDecorator,
   getPostCommentDecorator,
+  likeCommentDecorator,
   updatePostCommentByAdminDecorator,
   updatePostCommentDecorator,
 } from 'src/resources/post-comment/post-comment.decorators';
@@ -41,6 +45,42 @@ export class PostCommentController {
   @getCommentCountDecorator()
   getCommentCount() {
     return this.postCommentService.getCommentCount();
+  }
+
+  @Post('/like/:commentId')
+  @likeCommentDecorator()
+  likeComment(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Param('commentId') commentId: string,
+    @Body() body?: ReactCommentDto,
+  ) {
+    return this.postCommentService.likeComment({
+      commentId,
+      userId: decodedAccessToken.userId,
+      type: body?.type,
+    });
+  }
+
+  @Get('/get-likes/:commentId')
+  @getCommentLikesDecorator()
+  getCommentLikes(
+    @Param('commentId') commentId: string,
+    @Query('page') _page?: string,
+    @Query('limit') _limit?: string,
+    @Query('userId') userId?: string,
+    @Query('type') type?: ReactionType,
+  ) {
+    const { page, limit } = normalizePaginationParams({
+      page: +_page,
+      limit: +_limit,
+    });
+    return this.postCommentService.getCommentLikes({
+      commentId,
+      page,
+      limit,
+      userId,
+      type,
+    });
   }
 
   @Post('/:postId')
@@ -65,6 +105,7 @@ export class PostCommentController {
     @Query('replyTo') replyTo: string,
     @Query('page') _page: string,
     @Query('limit') _limit: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
   ) {
     const { page, limit } = normalizePaginationParams({
       page: parseInt(_page),
@@ -76,6 +117,7 @@ export class PostCommentController {
       page,
       limit,
       replyTo,
+      likeUserId: decodedAccessToken?.userId,
     });
   }
 

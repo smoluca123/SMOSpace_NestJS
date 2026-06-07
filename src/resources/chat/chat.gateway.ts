@@ -24,6 +24,7 @@ import {
   sendMessageSchema,
 } from 'src/resources/chat/schemas/chat.schemas';
 import { ZodValidationPipe } from 'src/pipes/zod.pipe';
+import { ChatMessageDataType } from 'src/libs/prisma-types';
 
 @UseGuards(WsJwtGuard)
 @WebSocketGateway({
@@ -53,6 +54,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect() {
     // Cleanup will be handled by the service
+  }
+
+  // Each user joins a personal room so they can receive message notifications
+  // for any of their conversations, even when not viewing that room.
+  @UseGuards(WsJwtVerifyGuard)
+  @SubscribeMessage('chat:subscribe')
+  async handleChatSubscribe(
+    @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
+  ) {
+    const userId = client.data.user.id;
+    client.join(`user:${userId}`);
+    return { success: true };
   }
 
   @UseGuards(WsJwtVerifyGuard)
@@ -102,30 +115,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       createMessageDto,
     );
 
-    // Broadcast to room
-    this.server
-      .to(`room:${createMessageDto.roomId}`)
-      .emit('newMessage', message);
-
-    // Notify participants who are not in the room
-    const participants = await this.prisma.chatParticipant.findMany({
-      where: {
-        roomId: createMessageDto.roomId,
-        leftAt: null,
-      },
-      select: {
-        userId: true,
-      },
-    });
-    participants.forEach((participant) => {
-      if (participant.userId !== userId) {
-        this.server
-          .to(`user:${participant.userId}`)
-          .emit('newMessage', message);
-      }
-    });
+    await this.broadcastMessage(message, userId);
 
     return message;
+  }
+
+  /**
+   * Broadcast a freshly created message to the room (live append) and to the
+   * other participants' personal rooms (toast + unread badge). Shared by the
+   * socket handler and the REST image-upload endpoint.
+   */
+  async broadcastMessage(message: ChatMessageDataType, senderId: string) {
+    const roomId = message.room?.id;
+    if (!roomId) return;
+
+    this.server.to(`room:${roomId}`).emit('newMessage', message);
+
+    (message.room?.participants || []).forEach((participant) => {
+      if (participant.userId && participant.userId !== senderId) {
+        this.server
+          .to(`user:${participant.userId}`)
+          .emit('chat:newMessageNotification', message);
+      }
+    });
+  }
+
+  /**
+   * Notify everyone in a room that a user has read its messages (read receipts).
+   */
+  emitMessagesRead(roomId: string, userId: string) {
+    this.server.to(`room:${roomId}`).emit('messagesRead', { roomId, userId });
   }
 
   @UseGuards(WsJwtAuthGuard)

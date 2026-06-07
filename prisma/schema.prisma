@@ -94,6 +94,8 @@ model User {
   friendOf             Friend[]            @relation("UserFriend")
   ChatParticipant      ChatParticipant[]
   ChatMessage          ChatMessage[]
+  bookmarks            Bookmark[]
+  commentLikes         PostCommentLike[]
 
   @@index([username, email, type])
   @@map("users")
@@ -229,20 +231,22 @@ model Post {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  author   User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  likes    PostLike[]
-  comments PostComment[]
-  media    Media[]
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  likes     PostLike[]
+  comments  PostComment[]
+  media     Media[]
+  bookmarks Bookmark[]
 
   @@index([authorId, createdAt])
   @@map("posts")
 }
 
 model PostLike {
-  id        String   @id @default(uuid())
+  id        String       @id @default(uuid())
   userId    String
   postId    String
-  createdAt DateTime @default(now()) @map("created_at")
+  type      ReactionType @default(LIKE)
+  createdAt DateTime     @default(now()) @map("created_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id])
@@ -250,7 +254,32 @@ model PostLike {
 
   // @@unique([userId, postId])
   @@index([userId, postId])
+  @@index([postId, type])
   @@map("post_likes")
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  HAHA
+  WOW
+  SAD
+  ANGRY
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId, createdAt])
+  @@map("bookmarks")
 }
 
 model Follow {
@@ -275,17 +304,35 @@ model PostComment {
   authorId     String   @map("author_id")
   replyToId    String?  @map("reply_to_id")
   repliesCount Int      @default(0) @map("replies_count")
+  likeCount    Int      @default(0) @map("like_count")
   level        Int      @default(0) @map("level")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  replyTo PostComment?  @relation("CommentReplies", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies PostComment[] @relation("CommentReplies")
+  post    Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  replyTo PostComment?      @relation("CommentReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies PostComment[]     @relation("CommentReplies")
+  likes   PostCommentLike[]
 
   @@index([postId, authorId, replyToId, createdAt])
   @@map("post_comments")
+}
+
+model PostCommentLike {
+  id        String       @id @default(uuid())
+  userId    String       @map("user_id")
+  commentId String       @map("comment_id")
+  type      ReactionType @default(LIKE)
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  user    User        @relation(fields: [userId], references: [id])
+  comment PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, commentId])
+  @@index([commentId, type])
+  @@map("post_comment_likes")
 }
 
 // Enum cho notification types
@@ -455,6 +502,7 @@ model ChatParticipant {
   userId   String    @map("user_id")
   roomId   String    @map("room_id")
   role     ChatRole  @default(MEMBER)
+  isMuted  Boolean   @default(false) @map("is_muted")
   joinedAt DateTime  @default(now()) @map("joined_at")
   leftAt   DateTime? @map("left_at")
 

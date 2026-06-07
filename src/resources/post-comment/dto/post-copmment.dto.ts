@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ReactionType } from '@prisma/client';
 import {
   IsArray,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -34,6 +36,22 @@ export class UpdatePostCommentDto {
   @IsString()
   @IsOptional()
   content?: string;
+}
+
+/**
+ * Body for `POST /post/comment/like/:commentId`. The `type` field is optional
+ * so legacy clients sending an empty body still get the classic LIKE toggle
+ * (server-side default).
+ */
+export class ReactCommentDto {
+  @ApiPropertyOptional({
+    enum: ReactionType,
+    required: false,
+    description: 'Reaction type. Defaults to LIKE when omitted.',
+  })
+  @IsEnum(ReactionType)
+  @IsOptional()
+  type?: ReactionType;
 }
 
 // export class UpdatePostCommentAdminDto extends UpdatePostCommentDto {

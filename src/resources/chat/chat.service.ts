@@ -1,7 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { ChatRoom, ChatRole, ChatRoomStatus, Prisma } from '@prisma/client';
+import {
+  ChatRoom,
+  ChatRole,
+  ChatRoomStatus,
+  FriendStatus,
+  MessageType,
+  Prisma,
+} from '@prisma/client';
 import {
   IBeforeTransformPaginationResponseType,
   IBeforeTransformResponseType,
@@ -14,10 +21,14 @@ import {
   chatRoomDataSelect,
   ChatRoomDataType,
 } from 'src/libs/prisma-types';
+import { S3Service } from 'src/services/aws/s3/s3.service';
 
 @Injectable()
 export class ChatService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   async getUserActiveRooms({
     userId,
@@ -27,33 +38,330 @@ export class ChatService {
     userId: string;
     limit?: number;
     page?: number;
-  }): Promise<IBeforeTransformPaginationResponseType<ChatRoomDataType>> {
+  }): Promise<
+    IBeforeTransformPaginationResponseType<
+      ChatRoomDataType & { unreadCount: number }
+    >
+  > {
     const whereQuery: Prisma.ChatRoomWhereInput = {
-      status: ChatRoomStatus.APPROVED,
       participants: {
         some: {
           userId,
           leftAt: null,
         },
       },
+      OR: [
+        { status: ChatRoomStatus.APPROVED },
+        // Pending rooms I initiated (I already sent a message) still show for me
+        {
+          status: ChatRoomStatus.PENDING,
+          messages: { some: { senderId: userId } },
+        },
+      ],
     };
 
-    const rooms = await this.prisma.chatRoom.findMany({
-      where: whereQuery,
-      take: limit,
-      skip: (page - 1) * limit,
-      select: chatRoomDataSelect,
-    });
+    const [totalCount, rooms] = await this.prisma.$transaction([
+      this.prisma.chatRoom.count({ where: whereQuery }),
+      this.prisma.chatRoom.findMany({
+        where: whereQuery,
+        take: limit,
+        skip: (page - 1) * limit,
+        orderBy: { updatedAt: 'desc' },
+        select: chatRoomDataSelect,
+      }),
+    ]);
+
+    const roomsWithUnread = await this.attachUnreadCounts(rooms, userId);
 
     return {
       type: 'pagination',
       message: 'User active rooms',
       data: {
-        items: rooms,
-        totalCount: await this.prisma.chatRoom.count(),
+        items: roomsWithUnread,
+        totalCount,
         currentPage: page,
         pageSize: limit,
       },
+    };
+  }
+
+  /**
+   * Attach the per-room unread count (messages not sent by the user and not yet
+   * read by them) using a single grouped query instead of one query per room.
+   */
+  private async attachUnreadCounts<T extends { id: string }>(
+    rooms: T[],
+    userId: string,
+  ): Promise<(T & { unreadCount: number })[]> {
+    if (rooms.length === 0) return [];
+
+    const unreadGroups = await this.prisma.chatMessage.groupBy({
+      by: ['roomId'],
+      where: {
+        roomId: { in: rooms.map((room) => room.id) },
+        senderId: { not: userId },
+        NOT: { readBy: { has: userId } },
+      },
+      _count: { _all: true },
+    });
+
+    const unreadByRoom = new Map(
+      unreadGroups.map((group) => [group.roomId, group._count._all]),
+    );
+
+    return rooms.map((room) => ({
+      ...room,
+      unreadCount: unreadByRoom.get(room.id) ?? 0,
+    }));
+  }
+
+  /**
+   * Pending message requests for a user: PENDING direct rooms started by someone
+   * else (the user hasn't sent any message in them yet).
+   */
+  private messageRequestWhere(userId: string): Prisma.ChatRoomWhereInput {
+    return {
+      status: ChatRoomStatus.PENDING,
+      participants: { some: { userId, leftAt: null } },
+      AND: [
+        { messages: { some: {} } }, // has at least one message
+        { messages: { none: { senderId: userId } } }, // none sent by me
+      ],
+    };
+  }
+
+  async getMessageRequests({
+    userId,
+    limit = 20,
+    page = 1,
+  }: {
+    userId: string;
+    limit?: number;
+    page?: number;
+  }): Promise<IBeforeTransformPaginationResponseType<ChatRoomDataType>> {
+    const whereQuery = this.messageRequestWhere(userId);
+
+    const [totalCount, rooms] = await this.prisma.$transaction([
+      this.prisma.chatRoom.count({ where: whereQuery }),
+      this.prisma.chatRoom.findMany({
+        where: whereQuery,
+        take: limit,
+        skip: (page - 1) * limit,
+        orderBy: { updatedAt: 'desc' },
+        select: chatRoomDataSelect,
+      }),
+    ]);
+
+    return {
+      type: 'pagination',
+      message: 'Message requests',
+      data: {
+        items: rooms,
+        totalCount,
+        currentPage: page,
+        pageSize: limit,
+      },
+    };
+  }
+
+  async getMessageRequestCount(
+    userId: string,
+  ): Promise<IBeforeTransformResponseType<{ count: number }>> {
+    const count = await this.prisma.chatRoom.count({
+      where: this.messageRequestWhere(userId),
+    });
+
+    return {
+      type: 'response',
+      message: 'Message request count',
+      data: { count },
+    };
+  }
+
+  /**
+   * Ensure the user is an active participant of the room, returning the
+   * participant id. Throws when they are not, so callers don't act on rooms
+   * they don't belong to.
+   */
+  private async ensureParticipant(
+    userId: string,
+    roomId: string,
+  ): Promise<string> {
+    const participant = await this.prisma.chatParticipant.findFirst({
+      where: { userId, roomId, leftAt: null },
+      select: { id: true },
+    });
+
+    if (!participant) {
+      throw new BadRequestException('You are not a participant in this room');
+    }
+
+    return participant.id;
+  }
+
+  async acceptMessageRequest(
+    userId: string,
+    roomId: string,
+  ): Promise<IBeforeTransformResponseType<ChatRoom>> {
+    await this.ensureParticipant(userId, roomId);
+
+    const room = await this.prisma.chatRoom.update({
+      where: { id: roomId },
+      data: { status: ChatRoomStatus.APPROVED },
+    });
+
+    return {
+      type: 'response',
+      message: 'Message request accepted',
+      data: room,
+    };
+  }
+
+  async rejectMessageRequest(
+    userId: string,
+    roomId: string,
+  ): Promise<IBeforeTransformResponseType<{ success: boolean }>> {
+    await this.ensureParticipant(userId, roomId);
+
+    await this.prisma.chatRoom.update({
+      where: { id: roomId },
+      data: { status: ChatRoomStatus.REJECTED },
+    });
+
+    return {
+      type: 'response',
+      message: 'Message request rejected',
+      data: { success: true },
+    };
+  }
+
+  /**
+   * Total number of unread messages across all the user's rooms (header badge).
+   */
+  async getUnreadCount(
+    userId: string,
+  ): Promise<IBeforeTransformResponseType<{ count: number }>> {
+    const count = await this.prisma.chatMessage.count({
+      where: {
+        senderId: { not: userId },
+        NOT: { readBy: { has: userId } },
+        room: {
+          status: ChatRoomStatus.APPROVED,
+          participants: { some: { userId, leftAt: null } },
+        },
+      },
+    });
+
+    return {
+      type: 'response',
+      message: 'Unread message count',
+      data: { count },
+    };
+  }
+
+  /**
+   * Mark every message in a room as read for the given user.
+   */
+  async markRoomAsRead(
+    userId: string,
+    roomId: string,
+  ): Promise<IBeforeTransformResponseType<{ success: boolean }>> {
+    await this.prisma.chatMessage.updateMany({
+      where: {
+        roomId,
+        senderId: { not: userId },
+        NOT: { readBy: { has: userId } },
+      },
+      data: {
+        readBy: { push: userId },
+      },
+    });
+
+    return {
+      type: 'response',
+      message: 'Room marked as read',
+      data: { success: true },
+    };
+  }
+
+  /**
+   * Mark a room as unread for the user by removing them from the readBy list
+   * of the latest message they didn't send.
+   */
+  async markRoomAsUnread(
+    userId: string,
+    roomId: string,
+  ): Promise<IBeforeTransformResponseType<{ success: boolean }>> {
+    const latestMessage = await this.prisma.chatMessage.findFirst({
+      where: {
+        roomId,
+        senderId: { not: userId },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, readBy: true },
+    });
+
+    if (latestMessage) {
+      await this.prisma.chatMessage.update({
+        where: { id: latestMessage.id },
+        data: {
+          readBy: latestMessage.readBy.filter((id) => id !== userId),
+        },
+      });
+    }
+
+    return {
+      type: 'response',
+      message: 'Room marked as unread',
+      data: { success: true },
+    };
+  }
+
+  /**
+   * Toggle notification mute state for the user in a room.
+   */
+  async toggleMuteRoom(
+    userId: string,
+    roomId: string,
+  ): Promise<IBeforeTransformResponseType<{ isMuted: boolean }>> {
+    const participant = await this.prisma.chatParticipant.findFirst({
+      where: { userId, roomId },
+      select: { id: true, isMuted: true },
+    });
+
+    if (!participant) {
+      throw new BadRequestException('You are not a participant in this room');
+    }
+
+    const updated = await this.prisma.chatParticipant.update({
+      where: { id: participant.id },
+      data: { isMuted: !participant.isMuted },
+      select: { isMuted: true },
+    });
+
+    return {
+      type: 'response',
+      message: updated.isMuted ? 'Room muted' : 'Room unmuted',
+      data: { isMuted: updated.isMuted },
+    };
+  }
+
+  /**
+   * "Delete" a conversation for the user by leaving the room (soft, per-user).
+   */
+  async deleteConversation(
+    userId: string,
+    roomId: string,
+  ): Promise<IBeforeTransformResponseType<{ success: boolean }>> {
+    await this.prisma.chatParticipant.updateMany({
+      where: { userId, roomId },
+      data: { leftAt: new Date() },
+    });
+
+    return {
+      type: 'response',
+      message: 'Conversation deleted',
+      data: { success: true },
     };
   }
 
@@ -137,18 +445,29 @@ export class ChatService {
       select: chatMessageDataSelect,
     });
 
+    // Keep the room's lastMessage pointer + updatedAt in sync
+    await this.prisma.chatRoom.update({
+      where: { id: roomId },
+      data: { lastMessageId: message.id },
+    });
+
     return message;
   }
 
   async getRoomParticipants({
+    userId,
     roomId,
     limit = 10,
     page = 1,
   }: {
+    userId: string;
     roomId: string;
     limit?: number;
     page?: number;
   }): Promise<IBeforeTransformPaginationResponseType<ChatParticipantDataType>> {
+    // Only members of the room may view its participants
+    await this.ensureParticipant(userId, roomId);
+
     const whereQuery: Prisma.ChatParticipantWhereInput = {
       roomId,
       leftAt: null,
@@ -206,6 +525,25 @@ export class ChatService {
     userId1: string;
     userId2: string;
   }): Promise<ChatRoom> {
+    // Prevent starting a direct conversation when either user has blocked the
+    // other (block works in both directions).
+    const blockRelationship = await this.prisma.friend.findFirst({
+      where: {
+        status: FriendStatus.BLOCKED,
+        OR: [
+          { userId: userId1, friendId: userId2 },
+          { userId: userId2, friendId: userId1 },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (blockRelationship) {
+      throw new BadRequestException(
+        'Cannot start a conversation with a blocked user',
+      );
+    }
+
     // Check if direct chat already exists
     const existingRoom = await this.prisma.chatRoom.findFirst({
       where: {
@@ -221,13 +559,38 @@ export class ChatService {
     });
 
     if (existingRoom) {
+      // Re-activate participants who previously "deleted" (left) the conversation
+      await this.prisma.chatParticipant.updateMany({
+        where: { roomId: existingRoom.id, leftAt: { not: null } },
+        data: { leftAt: null },
+      });
+
+      // A previously rejected request becomes a new pending request again
+      if (existingRoom.status === ChatRoomStatus.REJECTED) {
+        return this.prisma.chatRoom.update({
+          where: { id: existingRoom.id },
+          data: { status: ChatRoomStatus.PENDING },
+        });
+      }
       return existingRoom;
     }
 
-    // Create new direct chat room
+    // Friends can message freely (auto-approved); strangers go to message requests
+    const areFriends = await this.prisma.friend.findFirst({
+      where: {
+        status: FriendStatus.ACCEPTED,
+        OR: [
+          { userId: userId1, friendId: userId2 },
+          { userId: userId2, friendId: userId1 },
+        ],
+      },
+      select: { id: true },
+    });
+
     return this.prisma.chatRoom.create({
       data: {
         type: 'DIRECT',
+        status: areFriends ? ChatRoomStatus.APPROVED : ChatRoomStatus.PENDING,
         participants: {
           create: [{ userId: userId1 }, { userId: userId2 }],
         },
@@ -240,14 +603,24 @@ export class ChatService {
     creatorId: string,
     participantIds: string[],
   ): Promise<ChatRoom> {
+    // Exclude the creator from the member list to avoid duplicates
+    const memberIds = [...new Set(participantIds)].filter(
+      (id) => id !== creatorId,
+    );
+
+    if (memberIds.length === 0) {
+      throw new BadRequestException('A group needs at least one other member');
+    }
+
     return this.prisma.chatRoom.create({
       data: {
         name,
         type: 'GROUP',
+        status: ChatRoomStatus.APPROVED,
         participants: {
           create: [
             { userId: creatorId, role: ChatRole.ADMIN },
-            ...participantIds.map((userId) => ({
+            ...memberIds.map((userId) => ({
               userId,
               role: ChatRole.MEMBER,
             })),
@@ -257,17 +630,47 @@ export class ChatService {
     });
   }
 
+  /**
+   * Upload an image and create an IMAGE message in the room.
+   */
+  async handleCreateImageMessage(
+    userId: string,
+    roomId: string,
+    file: Express.Multer.File,
+  ): Promise<ChatMessageDataType> {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
+    const { url } = await this.s3Service.uploadImage({
+      file,
+      name: file.originalname,
+      userId,
+    });
+
+    return this.handleCreateMessage(userId, {
+      roomId,
+      content: url,
+      type: MessageType.IMAGE,
+    });
+  }
+
   async getRoomMessages({
+    userId,
     roomId,
     limit,
     page,
     before,
   }: {
+    userId: string;
     roomId: string;
     limit: number;
     page: number;
     before?: Date;
   }): Promise<IBeforeTransformPaginationResponseType<ChatMessageDataType>> {
+    // Only members of the room may read its messages
+    await this.ensureParticipant(userId, roomId);
+
     const whereQuery: Prisma.ChatMessageWhereInput = {
       roomId,
       ...(before && {
@@ -278,32 +681,10 @@ export class ChatService {
     const messages = await this.prisma.chatMessage.findMany({
       where: whereQuery,
       orderBy: {
-        createdAt: 'asc',
+        createdAt: 'desc',
       },
       take: limit,
       skip: (page - 1) * limit,
-      // include: {
-      //   sender: {
-      //     select: {
-      //       id: true,
-      //       username: true,
-      //       displayName: true,
-      //       avatar: true,
-      //     },
-      //   },
-      //   replyTo: {
-      //     include: {
-      //       sender: {
-      //         select: {
-      //           id: true,
-      //           username: true,
-      //           displayName: true,
-      //           avatar: true,
-      //         },
-      //       },
-      //     },
-      //   },
-      // },
       select: chatMessageDataSelect,
     });
     return {

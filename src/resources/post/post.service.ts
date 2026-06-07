@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { FriendStatus, Prisma } from '@prisma/client';
+import type { ReactionType } from '@prisma/client';
 import openai from 'src/configs/openai.config';
 import {
   blockResultMessage,
@@ -24,6 +25,7 @@ import {
   PostDataTypeWithLikes,
   PostDataTypeWithLikeStatus,
   PostLikeDataType,
+  PostReactionCounts,
   TrendingTopicType,
   userDataSelect,
   // TrendingTopicType,
@@ -107,6 +109,79 @@ export class PostService {
     }
   }
 
+  /**
+   * Returns the list of user IDs that are blocked relative to the given user,
+   * in either direction (users they blocked + users who blocked them).
+   */
+  private async getBlockedUserIds(currentUserId?: string): Promise<string[]> {
+    if (!currentUserId) return [];
+
+    const blockedRelationships = await this.prisma.friend.findMany({
+      where: {
+        status: FriendStatus.BLOCKED,
+        OR: [{ userId: currentUserId }, { friendId: currentUserId }],
+      },
+      select: { userId: true, friendId: true },
+    });
+
+    return blockedRelationships.map((rel) =>
+      rel.userId === currentUserId ? rel.friendId : rel.userId,
+    );
+  }
+
+  // ==================== REACTION HELPERS ====================
+
+  private static readonly REACTION_TYPES: ReactionType[] = [
+    'LIKE',
+    'LOVE',
+    'HAHA',
+    'WOW',
+    'SAD',
+    'ANGRY',
+  ];
+
+  /** Empty per-type reaction counter, all entries set to 0. */
+  private buildEmptyReactionCounts(): PostReactionCounts {
+    return PostService.REACTION_TYPES.reduce((acc, type) => {
+      acc[type] = 0;
+      return acc;
+    }, {} as PostReactionCounts);
+  }
+
+  /**
+   * Aggregate reaction counts (per `ReactionType`) for the given posts in a
+   * single grouped query - avoids N+1 when listing feeds.
+   * Returns a map: `postId -> PostReactionCounts`.
+   */
+  private async getReactionCountsByPostIds(
+    postIds: string[],
+  ): Promise<Map<string, PostReactionCounts>> {
+    const result = new Map<string, PostReactionCounts>();
+    if (postIds.length === 0) return result;
+
+    const groups = await this.prisma.postLike.groupBy({
+      by: ['postId', 'type'],
+      where: { postId: { in: postIds } },
+      _count: { _all: true },
+    });
+
+    for (const { postId, type, _count } of groups) {
+      const counts = result.get(postId) ?? this.buildEmptyReactionCounts();
+      counts[type] = _count._all;
+      result.set(postId, counts);
+    }
+
+    return result;
+  }
+
+  /** Convenience for a single post id. */
+  private async getReactionCountsByPostId(
+    postId: string,
+  ): Promise<PostReactionCounts> {
+    const map = await this.getReactionCountsByPostIds([postId]);
+    return map.get(postId) ?? this.buildEmptyReactionCounts();
+  }
+
   async getPosts({
     keywords = '',
     limit,
@@ -125,9 +200,15 @@ export class PostService {
     followUserId?: string;
   }): Promise<IPaginationResponseType<PostDataType>> {
     try {
+      // Users blocked by (or blocking) the viewer should never appear in feeds.
+      const blockedUserIds = await this.getBlockedUserIds(likeUserId);
+
       const whereQuery: Prisma.PostWhereInput = {
         authorId: userId || undefined,
         ...(!getPrivatePost ? { isPrivate: false } : {}),
+        ...(blockedUserIds.length
+          ? { NOT: { authorId: { in: blockedUserIds } } }
+          : {}),
         ...(followUserId
           ? {
               author: {
@@ -169,6 +250,15 @@ export class PostService {
               },
               select: {
                 userId: true,
+                type: true,
+              },
+            },
+            bookmarks: {
+              where: {
+                userId: likeUserId || '',
+              },
+              select: {
+                id: true,
               },
             },
           },
@@ -187,10 +277,21 @@ export class PostService {
         }),
       ]);
 
-      const postsWithLikeStatus = posts.map(({ likes, ...post }) => ({
-        ...post,
-        isLiked: likes.length > 0,
-      }));
+      const reactionCountsByPost = await this.getReactionCountsByPostIds(
+        posts.map((post) => post.id),
+      );
+
+      const postsWithLikeStatus = posts.map(
+        ({ likes, bookmarks, ...post }) => ({
+          ...post,
+          isLiked: likes.length > 0,
+          myReaction: likes[0]?.type ?? null,
+          reactionCounts:
+            reactionCountsByPost.get(post.id) ??
+            this.buildEmptyReactionCounts(),
+          isBookmarked: bookmarks.length > 0,
+        }),
+      );
 
       const totalPage = Math.ceil(totalCount / limit);
       const hasNextPage = page * limit < totalCount;
@@ -223,7 +324,9 @@ export class PostService {
     likeUserId?: string;
   }): Promise<IResponseType<PostDataTypeWithLikeStatus>> {
     try {
-      const post = await this.validatePost<PostDataTypeWithLikes>(postId, {
+      const post = await this.validatePost<
+        PostDataTypeWithLikes & { bookmarks: { id: string }[] }
+      >(postId, {
         ...postDataSelect,
         likes: {
           where: {
@@ -231,31 +334,18 @@ export class PostService {
           },
           select: {
             userId: true,
+            type: true,
+          },
+        },
+        bookmarks: {
+          where: {
+            userId: likeUserId || '',
+          },
+          select: {
+            id: true,
           },
         },
       });
-      // if (!postId) {
-      //   throw new BadRequestException({
-      //     message: 'Post id is required',
-      //     statusCode: 400,
-      //     date: new Date(),
-      //   });
-      // }
-
-      // const post = await this.prisma.post.findUnique({
-      //   where: { id: postId },
-      //   select: {
-      //     ...postDataSelect,
-      //     likes: {
-      //       where: {
-      //         userId: likeUserId || '',
-      //       },
-      //       select: {
-      //         userId: true,
-      //       },
-      //     },
-      //   },
-      // });
 
       if (!post) {
         throw new NotFoundException({
@@ -265,10 +355,27 @@ export class PostService {
         });
       }
 
+      // Check if post is private and user is not the owner
+      if (post.isPrivate) {
+        if (!likeUserId || post.author.id !== likeUserId) {
+          throw new ForbiddenException({
+            message: 'You do not have permission to view this private post',
+            statusCode: 403,
+            date: new Date(),
+          });
+        }
+      }
+
+      const reactionCounts = await this.getReactionCountsByPostId(post.id);
+
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { likes, ...postWithLikeStatus } = {
+      const { likes, bookmarks, ...postWithLikeStatus } = {
         ...post,
         isLiked: post.likes.length > 0,
+        myReaction:
+          (post.likes[0] as { type?: ReactionType } | undefined)?.type ?? null,
+        reactionCounts,
+        isBookmarked: post.bookmarks.length > 0,
       };
 
       return {
@@ -287,11 +394,13 @@ export class PostService {
     limit,
     page,
     userId,
+    type,
   }: {
     postId: string;
     page: number;
     limit: number;
     userId?: string;
+    type?: ReactionType;
   }): Promise<
     IPaginationResponseType<Omit<PostLikeDataType, 'post'>> & {
       data: {
@@ -325,6 +434,7 @@ export class PostService {
       const whereQuery: Prisma.PostLikeWhereInput = {
         postId,
         ...(userId ? { userId } : {}),
+        ...(type ? { type } : {}),
       };
 
       const [likes, totalCount] = await this.prisma.$transaction([
@@ -336,6 +446,7 @@ export class PostService {
 
           select: {
             id: true,
+            type: true,
             createdAt: true,
             user: {
               select: userDataSelect,
@@ -485,13 +596,26 @@ export class PostService {
     }
   }
 
+  /**
+   * Toggle / change a reaction on a post for the current user.
+   *
+   * Behavior matrix:
+   *   - no existing reaction              -> create new with `type`, +1 likeCount
+   *   - existing reaction same as `type`  -> remove (toggle off), -1 likeCount
+   *   - existing reaction different type  -> swap to `type`, likeCount unchanged
+   *
+   * `likeCount` is the total reaction count (kept as-is for backward compat
+   * with existing UI/columns).
+   */
   async likePost({
     postId,
     decodedAccessToken,
+    type = 'LIKE',
   }: {
     postId: string;
     decodedAccessToken: IDecodedAccecssTokenType;
-  }): Promise<IResponseType<PostDataType & { isLiked: boolean }>> {
+    type?: ReactionType;
+  }): Promise<IResponseType<PostDataTypeWithLikeStatus>> {
     try {
       if (!postId) {
         throw new BadRequestException({
@@ -501,7 +625,6 @@ export class PostService {
         });
       }
 
-      // Tối ưu: Chỉ lấy các trường cần thiết và kiểm tra like trong 1 query
       const post = await this.prisma.post.findUnique({
         where: { id: postId },
         select: {
@@ -511,7 +634,8 @@ export class PostService {
               userId: decodedAccessToken.userId,
             },
             select: {
-              userId: true,
+              id: true,
+              type: true,
             },
           },
         },
@@ -525,66 +649,240 @@ export class PostService {
         });
       }
 
-      const isLiked =
-        post.likes && post.likes[0]?.userId === decodedAccessToken.userId;
+      const existing = post.likes[0];
+      const isSameTypeToggle = existing?.type === type;
+      const isSwap = existing && existing.type !== type;
+      const isAdd = !existing;
 
-      // Tối ưu: Sử dụng 1 transaction duy nhất cho cả like và unlike
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const [_, updatedPost] = await this.prisma.$transaction([
-        isLiked
-          ? this.prisma.postLike.deleteMany({
-              where: {
-                postId: postId,
-                userId: decodedAccessToken.userId,
-              },
-            })
-          : this.prisma.postLike.create({
-              data: {
-                postId,
-                userId: decodedAccessToken.userId,
-              },
-            }),
-        this.prisma.post.update({
-          where: { id: postId },
+      // 1) Apply reaction change
+      if (isAdd) {
+        await this.prisma.postLike.create({
           data: {
-            likeCount: {
-              [isLiked ? 'decrement' : 'increment']: 1,
-            },
+            postId,
+            userId: decodedAccessToken.userId,
+            type,
           },
-          select: postDataSelect,
-        }),
-      ]);
+        });
+      } else if (isSameTypeToggle) {
+        await this.prisma.postLike.deleteMany({
+          where: {
+            postId,
+            userId: decodedAccessToken.userId,
+          },
+        });
+      } else if (isSwap) {
+        await this.prisma.postLike.updateMany({
+          where: {
+            postId,
+            userId: decodedAccessToken.userId,
+          },
+          data: { type },
+        });
+      }
 
-      // Handle notification: create when like, delete when unlike
-      if (isLiked) {
-        // Unlike: delete notification
+      // 2) Adjust the post's total reaction count (only on add/remove)
+      const updatedPost = await this.prisma.post.update({
+        where: { id: postId },
+        data: isAdd
+          ? { likeCount: { increment: 1 } }
+          : isSameTypeToggle
+            ? { likeCount: { decrement: 1 } }
+            : {},
+        select: postDataSelect,
+      });
+
+      // 3) Notification side-effect: create on add, delete on toggle-off, no-op on swap
+      if (isAdd && post.author.id !== decodedAccessToken.userId) {
+        const senderData = await this.prisma.user.findUnique({
+          where: { id: decodedAccessToken.userId },
+          select: userDataSelect,
+        });
+
+        if (senderData) {
+          await this.notificationService.createLikePostNotification({
+            recipientId: post.author.id,
+            senderId: decodedAccessToken.userId,
+            postId,
+            senderData,
+          });
+        }
+      } else if (isSameTypeToggle) {
         await this.notificationService.deleteLikePostNotification({
           recipientId: post.author.id,
           senderId: decodedAccessToken.userId,
           postId,
         });
-      } else {
-        // Like: create notification (skip if self-like)
-        if (post.author.id !== decodedAccessToken.userId) {
-          const senderData = await this.prisma.user.findUnique({
-            where: { id: decodedAccessToken.userId },
-            select: userDataSelect,
-          });
-
-          if (senderData) {
-            await this.notificationService.createLikePostNotification({
-              recipientId: post.author.id,
-              senderId: decodedAccessToken.userId,
-              postId,
-              senderData,
-            });
-          }
-        }
       }
 
+      const reactionCounts = await this.getReactionCountsByPostId(postId);
+      const myReaction: ReactionType | null = isSameTypeToggle ? null : type;
+
       return {
-        message: 'Post liked/unliked successfully',
-        data: { ...updatedPost, isLiked: !isLiked },
+        message: 'Post reaction updated successfully',
+        data: {
+          ...updatedPost,
+          isLiked: !!myReaction,
+          myReaction,
+          reactionCounts,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  /**
+   * Toggle bookmark (save/unsave) a post for the current user.
+   */
+  async toggleBookmark({
+    postId,
+    userId,
+  }: {
+    postId: string;
+    userId: string;
+  }): Promise<IResponseType<PostDataTypeWithLikeStatus>> {
+    try {
+      if (!postId) {
+        throw new BadRequestException('Post id is required');
+      }
+
+      const post = await this.prisma.post.findUnique({
+        where: { id: postId },
+        select: {
+          ...postDataSelect,
+          likes: {
+            where: { userId },
+            select: { userId: true, type: true },
+          },
+          bookmarks: {
+            where: { userId },
+            select: { id: true },
+          },
+        },
+      });
+
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+
+      const existingBookmark = post.bookmarks[0];
+
+      if (existingBookmark) {
+        await this.prisma.bookmark.delete({
+          where: { id: existingBookmark.id },
+        });
+      } else {
+        await this.prisma.bookmark.create({ data: { postId, userId } });
+      }
+
+      const reactionCounts = await this.getReactionCountsByPostId(post.id);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { likes, bookmarks, ...postData } = post;
+
+      return {
+        message: existingBookmark
+          ? 'Post removed from bookmarks'
+          : 'Post bookmarked successfully',
+        data: {
+          ...postData,
+          isLiked: likes.length > 0,
+          myReaction:
+            (likes[0] as { type?: ReactionType } | undefined)?.type ?? null,
+          reactionCounts,
+          isBookmarked: !existingBookmark,
+        },
+        statusCode: 200,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  /**
+   * Get the current user's bookmarked posts (most recent first).
+   */
+  async getMyBookmarks({
+    userId,
+    limit,
+    page,
+  }: {
+    userId: string;
+    limit: number;
+    page: number;
+  }): Promise<IPaginationResponseType<PostDataTypeWithLikeStatus>> {
+    try {
+      const blockedUserIds = await this.getBlockedUserIds(userId);
+
+      const whereQuery: Prisma.BookmarkWhereInput = {
+        userId,
+        post: {
+          // Respect private-post access control: a private post stays visible
+          // only to its author, even if someone bookmarked it earlier.
+          OR: [{ isPrivate: false }, { authorId: userId }],
+          ...(blockedUserIds.length
+            ? { NOT: { authorId: { in: blockedUserIds } } }
+            : {}),
+        },
+      };
+
+      const [totalCount, bookmarks] = await this.prisma.$transaction([
+        this.prisma.bookmark.count({ where: whereQuery }),
+        this.prisma.bookmark.findMany({
+          where: whereQuery,
+          take: limit,
+          skip: (page - 1) * limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            post: {
+              select: {
+                ...postDataSelect,
+                likes: {
+                  where: { userId },
+                  select: { userId: true, type: true },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+      const posts = bookmarks
+        .map((bookmark) => bookmark.post)
+        .filter((post): post is NonNullable<typeof post> => !!post);
+
+      const reactionCountsByPost = await this.getReactionCountsByPostIds(
+        posts.map((post) => post.id),
+      );
+
+      const items = posts.map(({ likes, ...post }) => ({
+        ...post,
+        isLiked: likes.length > 0,
+        myReaction:
+          (likes[0] as { type?: ReactionType } | undefined)?.type ?? null,
+        reactionCounts:
+          reactionCountsByPost.get(post.id) ?? this.buildEmptyReactionCounts(),
+        isBookmarked: true,
+      }));
+
+      const totalPage = Math.ceil(totalCount / limit);
+      const hasNextPage = page * limit < totalCount;
+      const hasPreviousPage = !!totalCount && page > 1;
+
+      return {
+        message: 'Bookmarks fetched successfully',
+        data: {
+          totalCount,
+          totalPage,
+          currentPage: page,
+          pageSize: limit,
+          hasNextPage,
+          hasPreviousPage,
+          items,
+        },
         statusCode: 200,
         date: new Date(),
       };

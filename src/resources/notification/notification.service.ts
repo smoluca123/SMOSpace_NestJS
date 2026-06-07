@@ -22,7 +22,9 @@ import {
   INotificationCommentPayload,
   INotificationFollowPayload,
   INotificationFriendRequestPayload,
+  INotificationFriendRequestAcceptPayload,
   INotificationLikePayload,
+  INotificationLikeCommentPayload,
   INotificationReplyCommentPayload,
   INotificationPostMentionPayload,
   INotificationCommentMentionPayload,
@@ -353,6 +355,88 @@ export class NotificationService {
     }
   }
 
+  // ==================== LIKE COMMENT NOTIFICATIONS ====================
+
+  async createLikeCommentNotification(
+    payload: INotificationLikeCommentPayload,
+  ) {
+    try {
+      // Skip if sender is recipient (self-like)
+      if (payload.senderId === payload.recipientId) return;
+
+      const message = this.formatMessage(
+        NOTIFICATION_MESSAGES.LIKE_COMMENT.message,
+        { username: payload.senderData.username },
+      );
+
+      const newNotification = await this.prisma.notification.create({
+        data: {
+          content: {
+            title: NOTIFICATION_MESSAGES.LIKE_COMMENT.title,
+            message,
+          },
+          entityType: EntityType.COMMENT,
+          metadata: {
+            postId: payload.postId,
+            commentId: payload.commentId,
+            liker: {
+              username: payload.senderData.username,
+              fullName: payload.senderData.fullName,
+              avatar: payload.senderData.avatar,
+            },
+          },
+          priority: NotificationPriority.NORMAL,
+          type: this.buildNotificationTypeConnect(
+            NotificationType_Type.LIKE_COMMENT,
+          ),
+          sender: { connect: { id: payload.senderId } },
+          recipient: { connect: { id: payload.recipientId } },
+        },
+        select: notificationDataSelect,
+      });
+
+      this.notificationGateway.emitNewNotification(newNotification);
+      return newNotification;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deleteLikeCommentNotification({
+    recipientId,
+    senderId,
+    postId,
+    commentId,
+  }: {
+    recipientId: string;
+    senderId: string;
+    postId: string;
+    commentId: string;
+  }) {
+    try {
+      const notification = await this.prisma.notification.findFirst({
+        where: {
+          type: {
+            type: NotificationType_Type.LIKE_COMMENT,
+          },
+          AND: [
+            { metadata: { path: ['postId'], equals: postId } },
+            { metadata: { path: ['commentId'], equals: commentId } },
+          ],
+          entityType: EntityType.COMMENT,
+          isDeleted: false,
+          recipientId,
+          senderId,
+        },
+      });
+
+      if (!notification) return;
+      return await this.deleteNotification(notification.id);
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
   // ==================== FOLLOW NOTIFICATIONS ====================
 
   async createFollowNotification(payload: INotificationFollowPayload) {
@@ -461,6 +545,52 @@ export class NotificationService {
         payload.recipientId,
         payload.senderId,
         NotificationType_Type.FRIEND_REQUEST,
+      );
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async createFriendAcceptNotification(
+    payload: INotificationFriendRequestAcceptPayload,
+  ) {
+    try {
+      const message = this.formatMessage(
+        NOTIFICATION_MESSAGES.FRIEND_ACCEPT.message,
+        { username: payload.senderData.username },
+      );
+
+      const notificationData: Prisma.NotificationCreateInput = {
+        isDeleted: false,
+        content: {
+          title: NOTIFICATION_MESSAGES.FRIEND_ACCEPT.title,
+          message,
+        },
+        entityType: EntityType.FRIENDSHIP,
+        metadata: {
+          friend: {
+            id: payload.friendId,
+            username: payload.senderData.username,
+            fullName: payload.senderData.fullName,
+            avatar: payload.senderData.avatar,
+          },
+        },
+        priority: NotificationPriority.NORMAL,
+        readAt: null,
+        isRead: false,
+        type: this.buildNotificationTypeConnect(
+          NotificationType_Type.FRIEND_ACCEPT,
+        ),
+        createdAt: new Date(),
+        sender: { connect: { id: payload.senderId } },
+        recipient: { connect: { id: payload.recipientId } },
+      };
+
+      return await this.createOrUpdateNotification(
+        notificationData,
+        payload.recipientId,
+        payload.senderId,
+        NotificationType_Type.FRIEND_ACCEPT,
       );
     } catch (error) {
       handleDefaultError(error);

@@ -40,5 +40,5 @@ export const envSchema = z.object({
     .url('OpenRouter provider URL must be a valid URL'),
 });
 
-// Export type để sử dụng cho TypeScript
+// Export type for use in TypeScript
 export type EnvConfig = z.infer<typeof envSchema>;

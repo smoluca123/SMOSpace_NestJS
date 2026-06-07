@@ -53,7 +53,7 @@ export class WsAuthMiddleware {
           },
         };
 
-        // Tạo mock context để pass vào guard cũ
+        // Build a mock context to pass into the existing guard
         const mockContext = {
           switchToHttp: () => ({
             getRequest: () => mockRequest,
@@ -65,7 +65,7 @@ export class WsAuthMiddleware {
           next(new Error('Unauthorized'));
         }
 
-        // Lưu user data vào socket instance để sử dụng sau này
+        // Store user data on the socket instance for later use
         socket.data.user = mockRequest['userData'];
         socket.data.decodedToken = mockRequest['decodedAccessToken'];
 

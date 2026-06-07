@@ -1,16 +1,17 @@
 import { RedisService } from '@liaoliaots/nestjs-redis';
 
-import { UseGuards, UsePipes } from '@nestjs/common';
+import { OnModuleInit, UseGuards, UsePipes } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 
 import { Redis } from 'ioredis';
-import { Socket } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import { WsJwtGuard } from 'src/guards/ws-auth.guard';
 import { WsJwtVerifyGuard } from 'src/guards/ws-jwt-verify.guard';
 import { SocketWithUserAndDecodedAccessToken } from 'src/interfaces/interfaces.global';
@@ -20,6 +21,14 @@ import {
   UserOnlineSchema,
 } from 'src/resources/gateways/user/schemas/user.schemas';
 
+const ONLINE_HASH_KEY = 'users:online';
+
+interface PresencePayload {
+  userId: string;
+  status: 'online' | 'away' | 'busy' | 'offline';
+  isOnline: boolean;
+}
+
 @UseGuards(WsJwtGuard)
 @WebSocketGateway({
   namespace: 'user',
@@ -27,15 +36,25 @@ import {
     origin: '*',
   },
 })
-export class UserGateway implements OnGatewayDisconnect {
+export class UserGateway implements OnGatewayDisconnect, OnModuleInit {
+  @WebSocketServer()
+  private server: Server;
+
   private redis: Redis | null;
+
+  // userId -> set of socket ids. Allows a user to stay "online" while at least
+  // one tab/device is still connected (multi-connection safety).
+  private userSockets: Map<string, Set<string>> = new Map();
+
   constructor(private readonly redisService: RedisService) {
     this.redis = this.redisService.getOrThrow();
   }
 
-  // async handleConnection(client: Socket) {
-  //   console.log('Client connected:', client.id);
-  // }
+  // Clear any stale presence left over from a previous (crashed) server run.
+  async onModuleInit() {
+    await this.redis.del(ONLINE_HASH_KEY);
+  }
+
   @UseGuards(WsJwtVerifyGuard)
   @UsePipes(new ZodValidationPipe(UserOnlineSchema))
   @SubscribeMessage('user:online')
@@ -45,21 +64,76 @@ export class UserGateway implements OnGatewayDisconnect {
   ) {
     const userId = client.data.user.id;
     const status = data.status || 'online';
-    await this.redis.hset('users:online', userId, JSON.stringify({ status }));
-    client.send({
-      status: 'success',
-      message: 'You are online',
-      data: {
-        status,
-        ...data,
-      },
-    });
+
+    const sockets = this.userSockets.get(userId);
+    const wasOffline = !sockets || sockets.size === 0;
+
+    if (!sockets) {
+      this.userSockets.set(userId, new Set([client.id]));
+    } else {
+      sockets.add(client.id);
+    }
+
+    await this.redis.hset(ONLINE_HASH_KEY, userId, JSON.stringify({ status }));
+
+    // Broadcast the presence so every client reflects this user's latest status.
+    // This is idempotent on the client side, so re-emitting for extra tabs or
+    // status changes (online -> away) is safe.
+    this.server.emit('user:presence:update', {
+      userId,
+      status,
+      isOnline: true,
+    } as PresencePayload);
+
+    // Send the full snapshot of who is online back to the caller so a freshly
+    // connected client can initialise its presence state.
+    const onlineUsers = await this.getOnlineUsers();
+    client.emit('user:online:list', onlineUsers);
+
+    return { status: 'success', firstConnection: wasOffline };
   }
 
   @UseGuards(WsJwtVerifyGuard)
+  @SubscribeMessage('user:getOnline')
+  async handleGetOnline(
+    @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
+  ) {
+    const onlineUsers = await this.getOnlineUsers();
+    client.emit('user:online:list', onlineUsers);
+    return { status: 'success' };
+  }
+
   handleDisconnect(client: SocketWithUserAndDecodedAccessToken | Socket) {
-    if (client.data.user) {
-      this.redis.hdel('users:online', client.data.user.id);
-    }
+    const user = client.data?.user;
+    if (!user) return;
+
+    const userId = user.id;
+    const sockets = this.userSockets.get(userId);
+    if (!sockets) return;
+
+    sockets.delete(client.id);
+    if (sockets.size > 0) return;
+
+    // Last connection for this user is gone -> mark offline and broadcast.
+    this.userSockets.delete(userId);
+    this.redis.hdel(ONLINE_HASH_KEY, userId);
+    this.server.emit('user:presence:update', {
+      userId,
+      status: 'offline',
+      isOnline: false,
+    } as PresencePayload);
+  }
+
+  private async getOnlineUsers(): Promise<PresencePayload[]> {
+    const all = await this.redis.hgetall(ONLINE_HASH_KEY);
+    return Object.entries(all).map(([userId, value]) => {
+      let status: PresencePayload['status'] = 'online';
+      try {
+        status = JSON.parse(value).status || 'online';
+      } catch {
+        status = 'online';
+      }
+      return { userId, status, isOnline: true };
+    });
   }
 }
