@@ -25,6 +25,7 @@ import {
   INotificationFriendRequestAcceptPayload,
   INotificationLikePayload,
   INotificationLikeCommentPayload,
+  INotificationSharePayload,
   INotificationReplyCommentPayload,
   INotificationPostMentionPayload,
   INotificationCommentMentionPayload,
@@ -424,6 +425,81 @@ export class NotificationService {
             { metadata: { path: ['commentId'], equals: commentId } },
           ],
           entityType: EntityType.COMMENT,
+          isDeleted: false,
+          recipientId,
+          senderId,
+        },
+      });
+
+      if (!notification) return;
+      return await this.deleteNotification(notification.id);
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  // ==================== SHARE POST NOTIFICATIONS ====================
+
+  async createSharePostNotification(payload: INotificationSharePayload) {
+    try {
+      // Skip if sender is recipient (sharing your own post)
+      if (payload.senderId === payload.recipientId) return;
+
+      const message = this.formatMessage(
+        NOTIFICATION_MESSAGES.SHARE_POST.message,
+        { username: payload.senderData.username },
+      );
+
+      const newNotification = await this.prisma.notification.create({
+        data: {
+          content: {
+            title: NOTIFICATION_MESSAGES.SHARE_POST.title,
+            message,
+          },
+          entityType: EntityType.POST,
+          metadata: {
+            postId: payload.postId,
+            sharePostId: payload.sharePostId,
+            sharer: {
+              username: payload.senderData.username,
+              fullName: payload.senderData.fullName,
+              avatar: payload.senderData.avatar,
+            },
+          },
+          priority: NotificationPriority.NORMAL,
+          type: this.buildNotificationTypeConnect(
+            NotificationType_Type.SHARE_POST,
+          ),
+          sender: { connect: { id: payload.senderId } },
+          recipient: { connect: { id: payload.recipientId } },
+        },
+        select: notificationDataSelect,
+      });
+
+      this.notificationGateway.emitNewNotification(newNotification);
+      return newNotification;
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  async deleteSharePostNotification({
+    recipientId,
+    senderId,
+    sharePostId,
+  }: {
+    recipientId: string;
+    senderId: string;
+    sharePostId: string;
+  }) {
+    try {
+      const notification = await this.prisma.notification.findFirst({
+        where: {
+          type: {
+            type: NotificationType_Type.SHARE_POST,
+          },
+          metadata: { path: ['sharePostId'], equals: sharePostId },
+          entityType: EntityType.POST,
           isDeleted: false,
           recipientId,
           senderId,

@@ -155,6 +155,53 @@ export class GenerateImagesDto {
 }
 
 /**
+ * Body for `POST /post/share/:postId`. Both fields are optional - an empty
+ * body shares the post with no caption, publicly.
+ */
+export class SharePostDto {
+  @ApiProperty({
+    default: '',
+    required: false,
+    description: 'Optional caption added on top of the shared post',
+  })
+  @IsString()
+  @IsOptional()
+  content?: string;
+
+  @ApiProperty({ default: false, required: false })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true';
+    }
+    return Boolean(value);
+  })
+  @IsBoolean()
+  @IsOptional()
+  isPrivate?: boolean;
+
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Array of user IDs mentioned in the share caption',
+    required: false,
+  })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  @IsArray()
+  @IsUUID(4, { each: true })
+  @IsOptional()
+  mentionedUserIds?: string[];
+}
+
+/**
  * Body for `POST /post/like/:postId`. The `type` field is optional to keep
  * backward compatibility with clients that just want a "Like" toggle - it
  * defaults to LIKE on the server.

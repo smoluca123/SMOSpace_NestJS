@@ -15,6 +15,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationService } from 'src/resources/notification/notification.service';
 import { UserService } from 'src/resources/user/user.service';
+import { ChatGateway } from 'src/resources/chat/chat.gateway';
 
 @Injectable()
 export class FriendService {
@@ -22,6 +23,7 @@ export class FriendService {
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly userService: UserService,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   async getFriendList({
@@ -817,6 +819,13 @@ export class FriendService {
           select: friendDataSelectWithInclude,
         });
 
+        // Real-time: let both clients refresh (chat banner, profile, feeds).
+        this.chatGateway.emitRelationshipChanged({
+          fromUserId: currentUser.id,
+          toUserId: user.id,
+          isBlocked: false,
+        });
+
         return {
           message: 'Friend unblocked successfully',
           data: {
@@ -885,6 +894,13 @@ export class FriendService {
           status: FriendStatus.BLOCKED,
         },
         select: friendDataSelectWithInclude,
+      });
+
+      // Real-time: let both clients refresh (chat banner, profile, feeds).
+      this.chatGateway.emitRelationshipChanged({
+        fromUserId: currentUser.id,
+        toUserId: user.id,
+        isBlocked: true,
       });
 
       return {

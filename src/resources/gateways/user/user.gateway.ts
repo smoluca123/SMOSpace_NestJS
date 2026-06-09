@@ -15,6 +15,7 @@ import { Server, Socket } from 'socket.io';
 import { WsJwtGuard } from 'src/guards/ws-auth.guard';
 import { WsJwtVerifyGuard } from 'src/guards/ws-jwt-verify.guard';
 import { SocketWithUserAndDecodedAccessToken } from 'src/interfaces/interfaces.global';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { ZodValidationPipe } from 'src/pipes/zod.pipe';
 import {
   UserOnline,
@@ -46,7 +47,10 @@ export class UserGateway implements OnGatewayDisconnect, OnModuleInit {
   // one tab/device is still connected (multi-connection safety).
   private userSockets: Map<string, Set<string>> = new Map();
 
-  constructor(private readonly redisService: RedisService) {
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly prisma: PrismaService,
+  ) {
     this.redis = this.redisService.getOrThrow();
   }
 
@@ -64,6 +68,18 @@ export class UserGateway implements OnGatewayDisconnect, OnModuleInit {
   ) {
     const userId = client.data.user.id;
     const status = data.status || 'online';
+
+    // Respect the user's privacy preference: when online status is hidden, do
+    // not register or broadcast their presence. Reciprocally, they don't get to
+    // see anyone else's presence either (return an empty snapshot).
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { showOnlineStatus: true },
+    });
+    if (dbUser && dbUser.showOnlineStatus === false) {
+      client.emit('user:online:list', []);
+      return { status: 'hidden' };
+    }
 
     const sockets = this.userSockets.get(userId);
     const wasOffline = !sockets || sockets.size === 0;
@@ -98,6 +114,16 @@ export class UserGateway implements OnGatewayDisconnect, OnModuleInit {
   async handleGetOnline(
     @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
   ) {
+    // Hidden users don't get to see others' presence (reciprocal privacy).
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: client.data.user.id },
+      select: { showOnlineStatus: true },
+    });
+    if (dbUser && dbUser.showOnlineStatus === false) {
+      client.emit('user:online:list', []);
+      return { status: 'hidden' };
+    }
+
     const onlineUsers = await this.getOnlineUsers();
     client.emit('user:online:list', onlineUsers);
     return { status: 'success' };

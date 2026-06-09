@@ -48,30 +48,31 @@ model AuthCode {
 //* New User Model
 
 model User {
-  id             String      @id @default(uuid())
-  username       String      @unique
-  email          String      @unique
-  bio            String?     @db.VarChar(1000)
-  gender         UserGender? @map("gender")
-  fullName       String      @map("full_name")
-  password       String?
-  displayName    String?     @map("display_name")
-  type           String
-  phoneNumber    String?     @map("phone_number")
-  age            Int?
-  refreshToken   String?     @map("refresh_token")
-  avatar         String?
-  coverImage     String?     @map("cover_image")
-  isActive       Boolean?    @default(false) @map("is_active")
-  isVerified     Boolean?    @default(false) @map("is_verified")
-  isBanned       Boolean?    @default(false) @map("is_banned")
-  createdAt      DateTime?   @default(now()) @map("created_at")
-  updatedAt      DateTime?   @default(now()) @updatedAt @map("updated_at")
-  credits        Decimal?    @default(0) @db.Decimal(10, 2)
-  postCount      Int         @default(0) @map("post_count")
-  followerCount  Int         @default(0) @map("follower_count")
-  followingCount Int         @default(0) @map("following_count")
-  friendCount    Int         @default(0) @map("friend_count")
+  id               String      @id @default(uuid())
+  username         String      @unique
+  email            String      @unique
+  bio              String?     @db.VarChar(1000)
+  gender           UserGender? @map("gender")
+  fullName         String      @map("full_name")
+  password         String?
+  displayName      String?     @map("display_name")
+  type             String
+  phoneNumber      String?     @map("phone_number")
+  age              Int?
+  refreshToken     String?     @map("refresh_token")
+  avatar           String?
+  coverImage       String?     @map("cover_image")
+  isActive         Boolean?    @default(false) @map("is_active")
+  isVerified       Boolean?    @default(false) @map("is_verified")
+  isBanned         Boolean?    @default(false) @map("is_banned")
+  showOnlineStatus Boolean?    @default(true) @map("show_online_status")
+  createdAt        DateTime?   @default(now()) @map("created_at")
+  updatedAt        DateTime?   @default(now()) @updatedAt @map("updated_at")
+  credits          Decimal?    @default(0) @db.Decimal(10, 2)
+  postCount        Int         @default(0) @map("post_count")
+  followerCount    Int         @default(0) @map("follower_count")
+  followingCount   Int         @default(0) @map("following_count")
+  friendCount      Int         @default(0) @map("friend_count")
 
   userType         UserType           @relation(fields: [type], references: [id], onDelete: Restrict)
   UserSession      UserSession[]
@@ -87,15 +88,19 @@ model User {
   notificationsReceived Notification[] @relation("NotificationRecipient")
 
   // Additional info
-  userAdditionalInfoId String?             @unique
-  additionalInfo       UserAdditionalInfo? @relation(fields: [userAdditionalInfoId], references: [id])
+  userAdditionalInfoId String?               @unique
+  additionalInfo       UserAdditionalInfo?   @relation(fields: [userAdditionalInfoId], references: [id])
   media                Media[]
   friends              Friend[]
-  friendOf             Friend[]            @relation("UserFriend")
+  friendOf             Friend[]              @relation("UserFriend")
   ChatParticipant      ChatParticipant[]
   ChatMessage          ChatMessage[]
+  chatMessageReactions ChatMessageReaction[]
   bookmarks            Bookmark[]
   commentLikes         PostCommentLike[]
+  stories              Story[]
+  storyViews           StoryView[]
+  pushSubscriptions    PushSubscription[]
 
   @@index([username, email, type])
   @@map("users")
@@ -105,6 +110,22 @@ enum UserGender {
   MALE
   FEMALE
   OTHER
+}
+
+//* Web Push subscriptions (browser Push API) for notifications when offline.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model UserAdditionalInfo {
@@ -228,16 +249,21 @@ model Post {
   isPrivate    Boolean  @map("is_private")
   likeCount    Int      @default(0) @map("like_count")
   commentCount Int      @default(0) @map("comment_count")
+  shareCount   Int      @default(0) @map("share_count")
+  sharedPostId String?  @map("shared_post_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  author    User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  likes     PostLike[]
-  comments  PostComment[]
-  media     Media[]
-  bookmarks Bookmark[]
+  author     User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  sharedPost Post?         @relation("PostShares", fields: [sharedPostId], references: [id], onDelete: SetNull)
+  shares     Post[]        @relation("PostShares")
+  likes      PostLike[]
+  comments   PostComment[]
+  media      Media[]
+  bookmarks  Bookmark[]
 
   @@index([authorId, createdAt])
+  @@index([sharedPostId])
   @@map("posts")
 }
 
@@ -514,24 +540,41 @@ model ChatParticipant {
 }
 
 model ChatMessage {
-  id        String      @id @default(uuid())
-  roomId    String      @map("room_id")
-  senderId  String      @map("sender_id")
-  content   String
-  type      MessageType @default(TEXT)
-  replyToId String?     @map("reply_to_id")
-  createdAt DateTime    @default(now()) @map("created_at")
-  updatedAt DateTime    @updatedAt @map("updated_at")
-  readBy    String[]    @map("read_by")
+  id          String      @id @default(uuid())
+  roomId      String      @map("room_id")
+  senderId    String      @map("sender_id")
+  content     String
+  type        MessageType @default(TEXT)
+  replyToId   String?     @map("reply_to_id")
+  isForwarded Boolean     @default(false) @map("is_forwarded")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  readBy      String[]    @map("read_by")
 
-  room              ChatRoom      @relation(fields: [roomId], references: [id])
-  sender            User          @relation(fields: [senderId], references: [id])
-  replyTo           ChatMessage?  @relation("MessageReply", fields: [replyToId], references: [id])
-  replies           ChatMessage[] @relation("MessageReply")
-  lastMessageOfRoom ChatRoom?     @relation("LastMessage")
+  room              ChatRoom              @relation(fields: [roomId], references: [id])
+  sender            User                  @relation(fields: [senderId], references: [id])
+  replyTo           ChatMessage?          @relation("MessageReply", fields: [replyToId], references: [id])
+  replies           ChatMessage[]         @relation("MessageReply")
+  lastMessageOfRoom ChatRoom?             @relation("LastMessage")
+  reactions         ChatMessageReaction[]
 
   @@index([roomId, createdAt])
   @@map("chat_messages")
+}
+
+model ChatMessageReaction {
+  id        String       @id @default(uuid())
+  userId    String       @map("user_id")
+  messageId String       @map("message_id")
+  type      ReactionType @default(LIKE)
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+  @@index([messageId, type])
+  @@map("chat_message_reactions")
 }
 
 enum ChatType {
@@ -549,11 +592,46 @@ enum MessageType {
   TEXT
   IMAGE
   FILE
+  VOICE
   SYSTEM
+  POST_SHARE
 }
 
 enum ChatRoomStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+model Story {
+  id           String    @id @default(uuid())
+  authorId     String    @map("author_id")
+  mediaUrl     String    @map("media_url")
+  type         MediaType @default(IMAGE)
+  thumbnailUrl String?   @map("thumbnail_url")
+  duration     Int? // seconds, for video
+  viewCount    Int       @default(0) @map("view_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  expiresAt    DateTime  @map("expires_at")
+
+  author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  views  StoryView[]
+
+  @@index([authorId, expiresAt])
+  @@index([expiresAt])
+  @@map("stories")
+}
+
+model StoryView {
+  id        String   @id @default(uuid())
+  storyId   String   @map("story_id")
+  viewerId  String   @map("viewer_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  story  Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewer User  @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, viewerId])
+  @@index([storyId])
+  @@map("story_views")
 }

@@ -17,6 +17,7 @@ import {
   DeletePostsDto,
   GenerateImagesDto,
   ReactPostDto,
+  SharePostDto,
   UpdatePostAsAdminDto,
   UpdatePostDto,
 } from 'src/resources/post/dto/post.dto';
@@ -32,10 +33,12 @@ import {
   getPostCountDecorator,
   getPostDecorator,
   getPostsAdminDecorator,
+  getPostsByHashtagDecorator,
   getPostsDecorator,
   getPriceGenerateImagesDecorator,
   getTrendingTopicsDecorator,
   likePostDecorator,
+  sharePostDecorator,
   updatePostAsAdminDecorator,
   updatePostDecorator,
 } from 'src/resources/post/post.decorators';
@@ -117,6 +120,26 @@ export class PostController {
   @getTrendingTopicsDecorator()
   getTrendingTopics() {
     return this.postService.getTrendingTopics();
+  }
+
+  @Get('hashtag/:tag')
+  @getPostsByHashtagDecorator()
+  getPostsByHashtag(
+    @Param('tag') tag: string,
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+    @Query('likeUserId') likeUserId?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.postService.getPosts({
+      hashtag: tag,
+      limit,
+      page,
+      likeUserId,
+    });
   }
 
   @Get('/bookmarks')
@@ -282,6 +305,22 @@ export class PostController {
     return this.postService.toggleBookmark({
       postId,
       userId: decodedAccessToken.userId,
+    });
+  }
+
+  @Post('/share/:postId')
+  @sharePostDecorator()
+  sharePost(
+    @Param('postId') postId: string,
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Body() body?: SharePostDto,
+  ) {
+    return this.postService.sharePost({
+      postId,
+      decodedAccessToken,
+      content: body?.content,
+      isPrivate: body?.isPrivate,
+      mentionedUserIds: body?.mentionedUserIds,
     });
   }
 

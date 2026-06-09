@@ -40,3 +40,21 @@ export const getRoomMessagesDecorator = () =>
 
 export const createDirectChatDecorator = () =>
   chatEndpointDecorator('Create direct chat');
+
+export const sharePostToChatDecorator = () =>
+  chatEndpointDecorator(
+    'Share a post into chats',
+    'Send a post as a message into one or more rooms / direct chats',
+  );
+
+export const getShareRecipientsDecorator = () =>
+  chatPaginatedEndpointDecorator(
+    'Get share recipients',
+    'List people the user can share a post with (friends, followings, existing chats)',
+  );
+
+export const forwardMessageDecorator = () =>
+  chatEndpointDecorator(
+    'Forward a message',
+    'Forward an existing message to one or more rooms',
+  );

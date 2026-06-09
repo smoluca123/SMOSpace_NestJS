@@ -35,6 +35,13 @@ export interface INotificationLikeCommentPayload extends INotificationPayload {
   commentId: string;
 }
 
+export interface INotificationSharePayload extends INotificationPayload {
+  /** The original post that was shared. */
+  postId: string;
+  /** The newly created share post. */
+  sharePostId: string;
+}
+
 export interface INotificationFriendRequestPayload
   extends INotificationPayload {
   friendId: string;

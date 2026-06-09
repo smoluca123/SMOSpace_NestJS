@@ -68,6 +68,10 @@ export class UpdateProfileDto {
   @IsNumber()
   @IsOptional()
   age: number;
+  @ApiPropertyOptional({ default: true })
+  @IsBoolean()
+  @IsOptional()
+  showOnlineStatus?: boolean;
   @ApiPropertyOptional({
     type: UserAdditionalInfoDto,
     description: 'Additional information about the user',
