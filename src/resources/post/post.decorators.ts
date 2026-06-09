@@ -99,6 +99,25 @@ export const getTrendingTopicsDecorator = () =>
     }),
   );
 
+export const getPostsByHashtagDecorator = () =>
+  applyDecorators(
+    ApiQueryLimitAndPage(),
+    ApiOperation({
+      summary: 'Get posts by hashtag',
+      description:
+        'Retrieve a paginated list of public posts containing a hashtag',
+    }),
+    ApiParam({
+      name: 'tag',
+      description: 'The hashtag to filter by (without the leading #)',
+    }),
+    ApiQuery({
+      name: 'likeUserId',
+      required: false,
+      description: 'User ID to hydrate like/bookmark status',
+    }),
+  );
+
 export const likePostDecorator = () =>
   applyDecorators(
     UseGuards(JwtTokenVerifyGuard),
@@ -112,6 +131,24 @@ export const likePostDecorator = () =>
     }),
     ApiParam({
       name: 'postId',
+    }),
+  );
+
+export const sharePostDecorator = () =>
+  applyDecorators(
+    UseGuards(JwtTokenVerifyGuard),
+    ApiOperation({
+      summary: 'Share / repost a post',
+      description:
+        'Create a new post that references the given post. Optionally include a caption. Authentication required.',
+    }),
+    ApiHeader({
+      name: 'accessToken',
+      required: true,
+    }),
+    ApiParam({
+      name: 'postId',
+      description: 'The ID of the post to share',
     }),
   );
 

@@ -190,6 +190,7 @@ export class PostService {
     likeUserId,
     getPrivatePost = false,
     followUserId,
+    hashtag,
   }: {
     keywords?: string;
     limit: number;
@@ -198,6 +199,7 @@ export class PostService {
     likeUserId?: string;
     getPrivatePost?: boolean;
     followUserId?: string;
+    hashtag?: string;
   }): Promise<IPaginationResponseType<PostDataType>> {
     try {
       // Users blocked by (or blocking) the viewer should never appear in feeds.
@@ -208,6 +210,9 @@ export class PostService {
         ...(!getPrivatePost ? { isPrivate: false } : {}),
         ...(blockedUserIds.length
           ? { NOT: { authorId: { in: blockedUserIds } } }
+          : {}),
+        ...(hashtag
+          ? { content: { contains: `#${hashtag}`, mode: 'insensitive' } }
           : {}),
         ...(followUserId
           ? {
@@ -588,6 +593,150 @@ export class PostService {
       return {
         message: 'Post created successfully',
         data: { ...post, media: images },
+        statusCode: 201,
+        date: new Date(),
+      };
+    } catch (error) {
+      handleDefaultError(error);
+    }
+  }
+
+  /**
+   * Share (repost) an existing post.
+   *
+   * Creates a new post owned by the current user that references the original
+   * via `sharedPostId`. Sharing a post that is itself a share collapses to the
+   * root original (no share-of-share chains). The original's `shareCount` is
+   * incremented and the original author receives a SHARE_POST notification.
+   */
+  async sharePost({
+    postId,
+    decodedAccessToken,
+    content = '',
+    isPrivate = false,
+    mentionedUserIds,
+  }: {
+    postId: string;
+    decodedAccessToken: IDecodedAccecssTokenType;
+    content?: string;
+    isPrivate?: boolean;
+    mentionedUserIds?: string[];
+  }): Promise<IResponseType<PostDataType>> {
+    try {
+      if (!postId) {
+        throw new BadRequestException('Post id is required');
+      }
+
+      const { userId } = decodedAccessToken;
+
+      const clicked = await this.prisma.post.findUnique({
+        where: { id: postId },
+        select: {
+          id: true,
+          isPrivate: true,
+          authorId: true,
+          sharedPostId: true,
+        },
+      });
+
+      if (!clicked) {
+        throw new NotFoundException('Post not found');
+      }
+
+      // Collapse share-of-share to the root original.
+      const targetId = clicked.sharedPostId ?? clicked.id;
+      const target = clicked.sharedPostId
+        ? await this.prisma.post.findUnique({
+            where: { id: targetId },
+            select: { id: true, isPrivate: true, authorId: true },
+          })
+        : clicked;
+
+      if (!target) {
+        throw new NotFoundException('Original post not found');
+      }
+
+      // A private post can only be shared by its own author.
+      if (target.isPrivate && target.authorId !== userId) {
+        throw new ForbiddenException('You cannot share a private post');
+      }
+
+      const [, , sharePost] = await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            credits: { increment: 0.2 },
+            postCount: { increment: 1 },
+          },
+        }),
+        this.prisma.post.update({
+          where: { id: targetId },
+          data: { shareCount: { increment: 1 } },
+          select: null,
+        }),
+        this.prisma.post.create({
+          data: {
+            content,
+            isPrivate,
+            authorId: userId,
+            sharedPostId: targetId,
+          },
+          select: postDataSelect,
+        }),
+      ]);
+
+      // Notify the original author (skip self-share).
+      if (target.authorId !== userId) {
+        const senderData = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: userDataSelect,
+        });
+
+        if (senderData) {
+          await this.notificationService.createSharePostNotification({
+            recipientId: target.authorId,
+            senderId: userId,
+            postId: targetId,
+            sharePostId: sharePost.id,
+            senderData,
+          });
+        }
+      }
+
+      // Handle mention notifications from the share caption (public shares only).
+      if (
+        mentionedUserIds &&
+        mentionedUserIds.length > 0 &&
+        !sharePost.isPrivate
+      ) {
+        const uniqueMentionedUserIds = [
+          ...new Set(mentionedUserIds.filter((id) => id !== userId)),
+        ];
+
+        const mentionPromises = uniqueMentionedUserIds.map((mentionedUserId) =>
+          this.notificationService.createPostMentionNotification({
+            senderId: userId,
+            recipientId: mentionedUserId,
+            postId: sharePost.id,
+            senderData: {
+              username: sharePost.author.username,
+              fullName: sharePost.author.fullName,
+              avatar: sharePost.author.avatar,
+            } as any,
+          }),
+        );
+
+        await Promise.allSettled(mentionPromises);
+      }
+
+      // Surface the new share post in realtime feeds (public only).
+      if (!sharePost.isPrivate) {
+        this.postGateway.emitNewPost(sharePost);
+      }
+
+      return {
+        message: 'Post shared successfully',
+        data: sharePost,
         statusCode: 201,
         date: new Date(),
       };
@@ -1092,7 +1241,7 @@ export class PostService {
     // Find the post and get its author ID
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
-      select: { authorId: true },
+      select: { authorId: true, sharedPostId: true },
     });
 
     if (!post) {
@@ -1104,6 +1253,32 @@ export class PostService {
 
     // Delete all notifications related to this post
     await this.notificationService.deletePostRelatedNotifications(postId);
+
+    // If this post is a share, decrement the original's shareCount and remove
+    // the share notification sent to the original author.
+    const sharedDecrement = post.sharedPostId
+      ? [
+          this.prisma.post.update({
+            where: { id: post.sharedPostId },
+            data: { shareCount: { decrement: 1 } },
+          }),
+        ]
+      : [];
+
+    const cleanupShareNotification = async (sharerId: string) => {
+      if (!post.sharedPostId) return;
+      const original = await this.prisma.post.findUnique({
+        where: { id: post.sharedPostId },
+        select: { authorId: true },
+      });
+      if (original && original.authorId !== sharerId) {
+        await this.notificationService.deleteSharePostNotification({
+          recipientId: original.authorId,
+          senderId: sharerId,
+          sharePostId: postId,
+        });
+      }
+    };
 
     if (userId) {
       // If userId provided, verify user exists and has permission
@@ -1120,16 +1295,23 @@ export class PostService {
       }
 
       // Delete post and decrement user's post count in a transaction
-      const [, deletedPost] = await this.prisma.$transaction([
+      const ops = [
         this.prisma.user.update({
           where: { id: userId },
           data: { postCount: { decrement: 1 } },
         }),
+        ...sharedDecrement,
         this.prisma.post.delete({
           where: { id: postId },
           select: postDataSelect,
         }),
-      ]);
+      ];
+      const results = await this.prisma.$transaction(ops);
+      const deletedPost = results[
+        results.length - 1
+      ] as unknown as PostDataType;
+
+      await cleanupShareNotification(post.authorId);
 
       return {
         message: 'Post deleted successfully',
@@ -1140,16 +1322,21 @@ export class PostService {
     }
 
     // Delete post and decrement user's post count in a transaction
-    const [, deletedPost] = await this.prisma.$transaction([
+    const ops = [
       this.prisma.user.update({
         where: { id: post.authorId },
         data: { postCount: { decrement: 1 } },
       }),
+      ...sharedDecrement,
       this.prisma.post.delete({
         where: { id: postId },
         select: postDataSelect,
       }),
-    ]);
+    ];
+    const results = await this.prisma.$transaction(ops);
+    const deletedPost = results[results.length - 1] as unknown as PostDataType;
+
+    await cleanupShareNotification(post.authorId);
 
     return {
       message: 'Post deleted successfully',

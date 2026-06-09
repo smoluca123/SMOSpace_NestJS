@@ -33,6 +33,7 @@ export const userDataSelect = {
   isActive: true,
   isVerified: true,
   isBanned: true,
+  showOnlineStatus: true,
   createdAt: true,
   updatedAt: true,
   credits: true,
@@ -98,7 +99,7 @@ export const mediaDataSelect = {
   duration: true,
 } satisfies Prisma.MediaSelect;
 
-export const postDataSelect = {
+const basePostDataSelect = {
   id: true,
   content: true,
   isPrivate: true,
@@ -106,11 +107,29 @@ export const postDataSelect = {
   updatedAt: true,
   likeCount: true,
   commentCount: true,
+  shareCount: true,
+  sharedPostId: true,
   media: {
     select: mediaDataSelect,
   },
   author: {
     select: userDataSelect,
+  },
+} satisfies Prisma.PostSelect;
+
+/**
+ * Select for an embedded shared/original post. Identical to `postDataSelect`
+ * but intentionally NOT recursing into its own `sharedPost` - we only embed a
+ * single level deep (a share of a share resolves to the root original).
+ */
+export const sharedPostDataSelect = {
+  ...basePostDataSelect,
+} satisfies Prisma.PostSelect;
+
+export const postDataSelect = {
+  ...basePostDataSelect,
+  sharedPost: {
+    select: sharedPostDataSelect,
   },
 } satisfies Prisma.PostSelect;
 
@@ -137,6 +156,10 @@ export const postLikeDataSelect = {
 export type PostDataType = Prisma.PostGetPayload<{
   select: typeof postDataSelect;
   // include: typeof postDataInclude;
+}>;
+
+export type SharedPostDataType = Prisma.PostGetPayload<{
+  select: typeof sharedPostDataSelect;
 }>;
 
 export type PostDataTypeWithLikes = PostDataType & {
@@ -364,6 +387,7 @@ export const chatMessageDataSelect = {
   content: true,
   createdAt: true,
   updatedAt: true,
+  isForwarded: true,
   sender: {
     select: userDataSelect,
   },
@@ -380,8 +404,33 @@ export const chatMessageDataSelect = {
   room: {
     select: chatRoomDataSelect,
   },
+  reactions: {
+    select: {
+      id: true,
+      userId: true,
+      type: true,
+    },
+  },
 } satisfies Prisma.ChatMessageSelect;
 
 export type ChatMessageDataType = Prisma.ChatMessageGetPayload<{
   select: typeof chatMessageDataSelect;
+}>;
+
+export const storyDataSelect = {
+  id: true,
+  mediaUrl: true,
+  type: true,
+  thumbnailUrl: true,
+  duration: true,
+  viewCount: true,
+  createdAt: true,
+  expiresAt: true,
+  author: {
+    select: userDataSelect,
+  },
+} satisfies Prisma.StorySelect;
+
+export type StoryDataType = Prisma.StoryGetPayload<{
+  select: typeof storyDataSelect;
 }>;

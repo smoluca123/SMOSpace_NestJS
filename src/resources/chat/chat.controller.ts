@@ -16,14 +16,20 @@ import { ChatGateway } from './chat.gateway';
 import {
   CreateFirstMessageDto,
   CreateGroupDto,
+  ForwardMessageDto,
+  ReactToMessageDto,
+  SharePostToChatDto,
 } from './dto/create-message.dto';
 import { AuthGuard } from '@nestjs/passport';
 import {
   chatEndpointDecorator,
   chatPaginatedEndpointDecorator,
   createDirectChatDecorator,
+  forwardMessageDecorator,
   getRoomMessagesDecorator,
+  getShareRecipientsDecorator,
   getUserRoomsDecorator,
+  sharePostToChatDecorator,
 } from 'src/resources/chat/chat.decorators';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { DecodedAccessToken } from 'src/decorators/decodedAccessToken.decorator';
@@ -152,6 +158,147 @@ export class ChatController {
       message: 'Image message sent',
       data: message,
     } satisfies IBeforeTransformResponseType<ChatMessageDataType>;
+  }
+
+  @Post('rooms/:roomId/file')
+  @chatEndpointDecorator('Send a file message')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 1024 * 1024 * 25 }, // 25MB
+    }),
+  )
+  async sendFileMessage(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Param('roomId') roomId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const message = await this.chatService.handleCreateFileMessage(
+      decodedAccessToken.userId,
+      roomId,
+      file,
+    );
+    await this.chatGateway.broadcastMessage(message, decodedAccessToken.userId);
+    return {
+      type: 'response',
+      message: 'File message sent',
+      data: message,
+    } satisfies IBeforeTransformResponseType<ChatMessageDataType>;
+  }
+
+  @Post('rooms/:roomId/voice')
+  @chatEndpointDecorator('Send a voice message')
+  @UseInterceptors(
+    FileInterceptor('audio', {
+      limits: { fileSize: 1024 * 1024 * 15 }, // 15MB
+    }),
+  )
+  async sendVoiceMessage(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Param('roomId') roomId: string,
+    @UploadedFile() audio: Express.Multer.File,
+    @Body('duration') duration?: string,
+  ) {
+    const message = await this.chatService.handleCreateVoiceMessage(
+      decodedAccessToken.userId,
+      roomId,
+      audio,
+      duration ? Math.round(+duration) : 0,
+    );
+    await this.chatGateway.broadcastMessage(message, decodedAccessToken.userId);
+    return {
+      type: 'response',
+      message: 'Voice message sent',
+      data: message,
+    } satisfies IBeforeTransformResponseType<ChatMessageDataType>;
+  }
+
+  @Get('share-recipients')
+  @getShareRecipientsDecorator()
+  getShareRecipients(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Query('search') search?: string,
+    @Query('limit') _limit?: string,
+    @Query('page') _page?: string,
+  ) {
+    const { limit, page } = normalizePaginationParams({
+      limit: +_limit,
+      page: +_page,
+    });
+    return this.chatService.getShareRecipients({
+      userId: decodedAccessToken.userId,
+      search,
+      limit,
+      page,
+    });
+  }
+
+  @Post('share-post/:postId')
+  @sharePostToChatDecorator()
+  async sharePostToChat(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Param('postId') postId: string,
+    @Body() body: SharePostToChatDto,
+  ) {
+    const result = await this.chatService.sharePostToChats({
+      userId: decodedAccessToken.userId,
+      postId,
+      roomIds: body.roomIds,
+      userIds: body.userIds,
+    });
+
+    // Broadcast each created message to its room + recipients.
+    await Promise.all(
+      result.data.map((message) =>
+        this.chatGateway.broadcastMessage(message, decodedAccessToken.userId),
+      ),
+    );
+
+    return result;
+  }
+
+  @Post('messages/:messageId/forward')
+  @forwardMessageDecorator()
+  async forwardMessage(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Param('messageId') messageId: string,
+    @Body() body: ForwardMessageDto,
+  ) {
+    const result = await this.chatService.forwardMessage({
+      userId: decodedAccessToken.userId,
+      messageId,
+      roomIds: body.roomIds,
+    });
+
+    await Promise.all(
+      result.data.map((message) =>
+        this.chatGateway.broadcastMessage(message, decodedAccessToken.userId),
+      ),
+    );
+
+    return result;
+  }
+
+  @Post('messages/:messageId/react')
+  @chatEndpointDecorator('Toggle a reaction on a chat message')
+  async reactToMessage(
+    @DecodedAccessToken() decodedAccessToken: IDecodedAccecssTokenType,
+    @Param('messageId') messageId: string,
+    @Body() body: ReactToMessageDto,
+  ) {
+    const result = await this.chatService.reactToMessage({
+      userId: decodedAccessToken.userId,
+      messageId,
+      type: body.type,
+    });
+
+    // Broadcast the updated message so every participant in the room gets a
+    // fresh reaction snapshot in real time.
+    const roomId = result.data.message.room?.id;
+    if (roomId) {
+      this.chatGateway.emitMessageReactionUpdated(roomId, result.data.message);
+    }
+
+    return result;
   }
 
   @Get('active-rooms')

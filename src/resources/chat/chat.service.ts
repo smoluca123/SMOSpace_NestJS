@@ -8,6 +8,7 @@ import {
   FriendStatus,
   MessageType,
   Prisma,
+  ReactionType,
 } from '@prisma/client';
 import {
   IBeforeTransformPaginationResponseType,
@@ -376,11 +377,167 @@ export class ChatService {
     return !!participant;
   }
 
+  /**
+   * Candidate recipients for sharing a post into a direct chat: people the
+   * user can reasonably message - friends, people they follow, and anyone they
+   * already have a direct conversation with. Blocked users (either direction)
+   * are excluded. Supports an optional name/username search.
+   */
+  async getShareRecipients({
+    userId,
+    search,
+    limit = 20,
+    page = 1,
+  }: {
+    userId: string;
+    search?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<
+    IBeforeTransformPaginationResponseType<{
+      id: string;
+      username: string;
+      fullName: string;
+      avatar: string | null;
+    }>
+  > {
+    // 1) Friends (accepted, either direction)
+    const friendRows = await this.prisma.friend.findMany({
+      where: {
+        status: FriendStatus.ACCEPTED,
+        OR: [{ userId }, { friendId: userId }],
+      },
+      select: { userId: true, friendId: true },
+    });
+
+    // 2) People the user follows
+    const followRows = await this.prisma.follow.findMany({
+      where: { followerId: userId },
+      select: { followingId: true },
+    });
+
+    // 3) Existing direct-chat partners
+    const directRooms = await this.prisma.chatRoom.findMany({
+      where: {
+        type: 'DIRECT',
+        participants: { some: { userId, leftAt: null } },
+      },
+      select: { participants: { select: { userId: true } } },
+    });
+
+    // 4) Blocked users (either direction) - excluded
+    const blockedRows = await this.prisma.friend.findMany({
+      where: {
+        status: FriendStatus.BLOCKED,
+        OR: [{ userId }, { friendId: userId }],
+      },
+      select: { userId: true, friendId: true },
+    });
+
+    const candidateIds = new Set<string>();
+    friendRows.forEach((row) => {
+      candidateIds.add(row.userId === userId ? row.friendId : row.userId);
+    });
+    followRows.forEach((row) => candidateIds.add(row.followingId));
+    directRooms.forEach((room) =>
+      room.participants.forEach((p) => {
+        if (p.userId && p.userId !== userId) candidateIds.add(p.userId);
+      }),
+    );
+
+    // Remove self + blocked
+    candidateIds.delete(userId);
+    blockedRows.forEach((row) => {
+      candidateIds.delete(row.userId === userId ? row.friendId : row.userId);
+    });
+
+    const ids = [...candidateIds];
+
+    if (ids.length === 0) {
+      return {
+        type: 'pagination',
+        message: 'Share recipients',
+        data: { items: [], totalCount: 0, currentPage: page, pageSize: limit },
+      };
+    }
+
+    const whereQuery: Prisma.UserWhereInput = {
+      id: { in: ids },
+      ...(search
+        ? {
+            OR: [
+              { fullName: { contains: search, mode: 'insensitive' } },
+              { username: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [totalCount, users] = await this.prisma.$transaction([
+      this.prisma.user.count({ where: whereQuery }),
+      this.prisma.user.findMany({
+        where: whereQuery,
+        take: limit,
+        skip: (page - 1) * limit,
+        orderBy: { fullName: 'asc' },
+        select: { id: true, username: true, fullName: true, avatar: true },
+      }),
+    ]);
+
+    return {
+      type: 'pagination',
+      message: 'Share recipients',
+      data: { items: users, totalCount, currentPage: page, pageSize: limit },
+    };
+  }
+
+  /**
+   * Block enforcement for direct conversations: if the sender and the other
+   * participant have a BLOCKED relationship (in either direction), messaging is
+   * not allowed. Group rooms are unaffected. Throws BadRequestException when the
+   * message must be rejected.
+   */
+  private async assertNotBlockedInDirectRoom(
+    senderId: string,
+    roomId: string,
+  ): Promise<void> {
+    const room = await this.prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      select: {
+        type: true,
+        participants: { select: { userId: true } },
+      },
+    });
+
+    if (!room || room.type !== 'DIRECT') return;
+
+    const otherId = room.participants.find(
+      (p) => p.userId && p.userId !== senderId,
+    )?.userId;
+
+    if (!otherId) return;
+
+    const blockRelationship = await this.prisma.friend.findFirst({
+      where: {
+        status: FriendStatus.BLOCKED,
+        OR: [
+          { userId: senderId, friendId: otherId },
+          { userId: otherId, friendId: senderId },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (blockRelationship) {
+      throw new BadRequestException('Cannot send a message to a blocked user');
+    }
+  }
+
   async handleCreateMessage(
     userId: string,
     createMessageDto: CreateMessageDto,
   ): Promise<ChatMessageDataType> {
-    const { roomId, content, type, replyToId } = createMessageDto;
+    const { roomId, content, type, replyToId, isForwarded } = createMessageDto;
 
     // Verify user is a participant
     const participant = await this.prisma.chatParticipant.findFirst({
@@ -394,6 +551,9 @@ export class ChatService {
     if (!participant) {
       throw new BadRequestException('User is not a participant in this room');
     }
+
+    // For direct conversations, block (in either direction) prevents messaging.
+    await this.assertNotBlockedInDirectRoom(userId, roomId);
 
     // If this is a reply, verify the original message exists
     if (replyToId) {
@@ -417,31 +577,10 @@ export class ChatService {
         content,
         type,
         replyToId,
+        isForwarded: isForwarded ?? false,
 
         readBy: [userId], // Mark as read by sender
       },
-      //   include: {
-      //     sender: {
-      //       select: {
-      //         id: true,
-      //         username: true,
-      //         displayName: true,
-      //         avatar: true,
-      //       },
-      //     },
-      //     replyTo: {
-      //       include: {
-      //         sender: {
-      //           select: {
-      //             id: true,
-      //             username: true,
-      //             displayName: true,
-      //             avatar: true,
-      //           },
-      //         },
-      //       },
-      //     },
-      //   },
       select: chatMessageDataSelect,
     });
 
@@ -452,6 +591,118 @@ export class ChatService {
     });
 
     return message;
+  }
+
+  /**
+   * Share a post into one or more chats.
+   *
+   * `roomIds` target existing rooms the user belongs to; `userIds` are resolved
+   * to direct rooms (created/reused). A POST_SHARE message is created in each
+   * room with the post id as its content. Returns every created message so the
+   * caller (controller) can broadcast them over the socket.
+   */
+  async sharePostToChats({
+    userId,
+    postId,
+    roomIds = [],
+    userIds = [],
+  }: {
+    userId: string;
+    postId: string;
+    roomIds?: string[];
+    userIds?: string[];
+  }): Promise<IBeforeTransformResponseType<ChatMessageDataType[]>> {
+    if (roomIds.length === 0 && userIds.length === 0) {
+      throw new BadRequestException('Pick at least one recipient');
+    }
+
+    // Validate the post and its visibility.
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true, isPrivate: true, authorId: true },
+    });
+
+    if (!post) {
+      throw new BadRequestException('Post not found');
+    }
+
+    if (post.isPrivate && post.authorId !== userId) {
+      throw new BadRequestException('You cannot share a private post');
+    }
+
+    // Resolve direct rooms for each target user.
+    const resolvedRoomIds = new Set<string>(roomIds);
+    for (const targetUserId of userIds) {
+      if (targetUserId === userId) continue;
+      const room = await this.handleCreateDirectChatRoom({
+        userId1: userId,
+        userId2: targetUserId,
+      });
+      resolvedRoomIds.add(room.id);
+    }
+
+    const messages: ChatMessageDataType[] = [];
+    for (const roomId of resolvedRoomIds) {
+      const message = await this.handleCreateMessage(userId, {
+        roomId,
+        content: postId,
+        type: MessageType.POST_SHARE,
+      });
+      messages.push(message);
+    }
+
+    return {
+      type: 'response',
+      message: 'Post shared to chats',
+      data: messages,
+    };
+  }
+
+  /**
+   * Forward an existing message to one or more rooms. Copies the original's
+   * content + type and flags the new messages as forwarded.
+   */
+  async forwardMessage({
+    userId,
+    messageId,
+    roomIds,
+  }: {
+    userId: string;
+    messageId: string;
+    roomIds: string[];
+  }): Promise<IBeforeTransformResponseType<ChatMessageDataType[]>> {
+    if (!roomIds || roomIds.length === 0) {
+      throw new BadRequestException('Pick at least one destination');
+    }
+
+    const original = await this.prisma.chatMessage.findUnique({
+      where: { id: messageId },
+      select: { id: true, roomId: true, content: true, type: true },
+    });
+
+    if (!original) {
+      throw new BadRequestException('Message not found');
+    }
+
+    // The user must belong to the room the message came from.
+    await this.ensureParticipant(userId, original.roomId);
+
+    const messages: ChatMessageDataType[] = [];
+    for (const roomId of [...new Set(roomIds)]) {
+      const message = await this.handleCreateMessage(userId, {
+        roomId,
+        content: original.content,
+        type: original.type,
+        isForwarded: true,
+      });
+      messages.push(message);
+    }
+
+    return {
+      type: 'response',
+      message: 'Message forwarded',
+      data: messages,
+    };
   }
 
   async getRoomParticipants({
@@ -516,6 +767,77 @@ export class ChatService {
         },
       },
     });
+  }
+
+  /**
+   * Toggle a reaction on a chat message.
+   *
+   * - No existing reaction       -> create with `type`
+   * - Existing reaction same     -> remove (toggle off)
+   * - Existing reaction different -> update to new `type` (swap)
+   *
+   * Returns the updated message (with full reaction list) so callers can
+   * broadcast/serve a fresh snapshot.
+   */
+  async reactToMessage({
+    userId,
+    messageId,
+    type,
+  }: {
+    userId: string;
+    messageId: string;
+    type: ReactionType;
+  }): Promise<
+    IBeforeTransformResponseType<{
+      message: ChatMessageDataType;
+      myReaction: ReactionType | null;
+    }>
+  > {
+    const message = await this.prisma.chatMessage.findUnique({
+      where: { id: messageId },
+      select: { id: true, roomId: true },
+    });
+
+    if (!message) {
+      throw new BadRequestException('Message not found');
+    }
+
+    // Only members of the room may react
+    await this.ensureParticipant(userId, message.roomId);
+
+    const existing = await this.prisma.chatMessageReaction.findUnique({
+      where: { userId_messageId: { userId, messageId } },
+      select: { id: true, type: true },
+    });
+
+    let myReaction: ReactionType | null = type;
+
+    if (!existing) {
+      await this.prisma.chatMessageReaction.create({
+        data: { userId, messageId, type },
+      });
+    } else if (existing.type === type) {
+      await this.prisma.chatMessageReaction.delete({
+        where: { id: existing.id },
+      });
+      myReaction = null;
+    } else {
+      await this.prisma.chatMessageReaction.update({
+        where: { id: existing.id },
+        data: { type },
+      });
+    }
+
+    const updated = await this.prisma.chatMessage.findUniqueOrThrow({
+      where: { id: messageId },
+      select: chatMessageDataSelect,
+    });
+
+    return {
+      type: 'response',
+      message: 'Message reaction updated',
+      data: { message: updated, myReaction },
+    };
   }
 
   async handleCreateDirectChatRoom({
@@ -652,6 +974,73 @@ export class ChatService {
       roomId,
       content: url,
       type: MessageType.IMAGE,
+    });
+  }
+
+  /**
+   * Upload a generic file attachment and create a FILE message. The message
+   * `content` stores a JSON descriptor `{ url, name, size, mime }` so the
+   * client can render a download card with the original metadata.
+   */
+  async handleCreateFileMessage(
+    userId: string,
+    roomId: string,
+    file: Express.Multer.File,
+  ): Promise<ChatMessageDataType> {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const { url } = await this.s3Service.uploadRawFile({
+      file,
+      name: file.originalname,
+      userId,
+    });
+
+    const content = JSON.stringify({
+      url,
+      name: file.originalname,
+      size: file.size,
+      mime: file.mimetype,
+    });
+
+    return this.handleCreateMessage(userId, {
+      roomId,
+      content,
+      type: MessageType.FILE,
+    });
+  }
+
+  /**
+   * Upload a voice note and create a VOICE message. The message `content`
+   * stores a JSON descriptor `{ url, duration, size }` (duration in seconds).
+   */
+  async handleCreateVoiceMessage(
+    userId: string,
+    roomId: string,
+    file: Express.Multer.File,
+    duration?: number,
+  ): Promise<ChatMessageDataType> {
+    if (!file) {
+      throw new BadRequestException('Audio file is required');
+    }
+
+    const { url } = await this.s3Service.uploadRawFile({
+      file,
+      name: file.originalname || `voice-${Date.now()}.webm`,
+      userId,
+    });
+
+    const content = JSON.stringify({
+      url,
+      duration: duration ?? 0,
+      size: file.size,
+    });
+
+    return this.handleCreateMessage(userId, {
+      roomId,
+      content,
+      type: MessageType.VOICE,
     });
   }
 

@@ -1,8 +1,14 @@
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
   PutObjectCommandInput,
   S3Client,
+  UploadPartCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -249,6 +255,40 @@ export class S3Service {
     }
   }
 
+  /**
+   * Upload an arbitrary file (chat attachment / voice note) directly to S3 and
+   * return its public URL. Unlike {@link uploadFile} this does NOT create a
+   * Media row - chat attachments aren't part of the post media gallery.
+   */
+  async uploadRawFile({
+    file,
+    name,
+    userId,
+  }: {
+    file: Express.Multer.File;
+    name: string;
+    userId: string;
+  }): Promise<{ url: string }> {
+    const bucketName = this.configService.get('S3_BUCKET_NAME');
+    const publicDir = this.configService.get('S3_PUBLIC_DIR');
+    const safeName = name.replace(/[^\w.\-]+/g, '_');
+    const key = `${publicDir}/chat/${userId}/${new Date().getFullYear()}/${Date.now()}_${safeName}`;
+
+    const params: PutObjectCommandInput = {
+      Bucket: bucketName,
+      Key: key,
+      Body: file.buffer,
+      ContentLength: file.size,
+      ContentType: file.mimetype,
+    };
+
+    const parallelUpload = new Upload({ client: this.s3Client, params });
+    await parallelUpload.done();
+
+    const url = `${this.configService.get('S3_PUBLIC_PATH_PREFIX')}/${key}`;
+    return { url };
+  }
+
   async uploadImage({
     file,
     name,
@@ -284,6 +324,131 @@ export class S3Service {
       expiresIn,
     });
     return signedUrl;
+  }
+
+  // ==================== DIRECT (PRESIGNED) UPLOADS ====================
+
+  /** Public URL for a stored object key. */
+  buildPublicUrl(key: string): string {
+    return `${this.configService.get('S3_PUBLIC_PATH_PREFIX')}/${key}`;
+  }
+
+  private get bucket(): string {
+    return this.configService.get('S3_BUCKET_NAME');
+  }
+
+  /** Presigned PUT URL for uploading a single object directly from the client. */
+  async presignPutObject({
+    key,
+    contentType,
+    expiresIn = 900,
+  }: {
+    key: string;
+    contentType: string;
+    expiresIn?: number;
+  }): Promise<string> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ContentType: contentType,
+    });
+    return getSignedUrl(this.s3Client, command, { expiresIn });
+  }
+
+  /** Start a multipart upload, returning its uploadId. */
+  async createMultipartUpload({
+    key,
+    contentType,
+  }: {
+    key: string;
+    contentType: string;
+  }): Promise<string> {
+    const res = await this.s3Client.send(
+      new CreateMultipartUploadCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ContentType: contentType,
+      }),
+    );
+    return res.UploadId as string;
+  }
+
+  /** Presigned URL for uploading one part of a multipart upload. */
+  async presignUploadPart({
+    key,
+    uploadId,
+    partNumber,
+    expiresIn = 900,
+  }: {
+    key: string;
+    uploadId: string;
+    partNumber: number;
+    expiresIn?: number;
+  }): Promise<string> {
+    const command = new UploadPartCommand({
+      Bucket: this.bucket,
+      Key: key,
+      UploadId: uploadId,
+      PartNumber: partNumber,
+    });
+    return getSignedUrl(this.s3Client, command, { expiresIn });
+  }
+
+  /** Finalize a multipart upload with the ETags collected from each part. */
+  async completeMultipartUpload({
+    key,
+    uploadId,
+    parts,
+  }: {
+    key: string;
+    uploadId: string;
+    parts: { partNumber: number; etag: string }[];
+  }): Promise<void> {
+    await this.s3Client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: this.bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: parts
+            .sort((a, b) => a.partNumber - b.partNumber)
+            .map((p) => ({ ETag: p.etag, PartNumber: p.partNumber })),
+        },
+      }),
+    );
+  }
+
+  /** Abort a multipart upload (cleanup on failure). */
+  async abortMultipartUpload({
+    key,
+    uploadId,
+  }: {
+    key: string;
+    uploadId: string;
+  }): Promise<void> {
+    try {
+      await this.s3Client.send(
+        new AbortMultipartUploadCommand({
+          Bucket: this.bucket,
+          Key: key,
+          UploadId: uploadId,
+        }),
+      );
+    } catch {
+      // ignore
+    }
+  }
+
+  /** True when an object exists at the given key. */
+  async objectExists(key: string): Promise<boolean> {
+    try {
+      await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async uploadMultipleFiles({

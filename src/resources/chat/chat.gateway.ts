@@ -25,6 +25,7 @@ import {
 } from 'src/resources/chat/schemas/chat.schemas';
 import { ZodValidationPipe } from 'src/pipes/zod.pipe';
 import { ChatMessageDataType } from 'src/libs/prisma-types';
+import { PushService } from 'src/resources/push/push.service';
 
 @UseGuards(WsJwtGuard)
 @WebSocketGateway({
@@ -42,6 +43,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly chatService: ChatService,
     private prisma: PrismaService,
+    private readonly pushService: PushService,
   ) {}
 
   async handleConnection() {
@@ -131,13 +133,58 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.server.to(`room:${roomId}`).emit('newMessage', message);
 
+    const senderName =
+      message.sender?.fullName || message.sender?.username || 'Someone';
+    const preview = this.buildPushPreview(message);
+
     (message.room?.participants || []).forEach((participant) => {
       if (participant.userId && participant.userId !== senderId) {
         this.server
           .to(`user:${participant.userId}`)
           .emit('chat:newMessageNotification', message);
+
+        // Web Push so muted-tab / closed-app users still get notified.
+        if (!participant.isMuted) {
+          void this.pushService
+            .sendToUser(participant.userId, {
+              title: senderName,
+              body: preview,
+              url: `/chat/${roomId}`,
+              tag: `chat-${roomId}`,
+            })
+            .catch(() => undefined);
+        }
       }
     });
+  }
+
+  /** Short notification preview for a chat message of any type. */
+  private buildPushPreview(message: ChatMessageDataType): string {
+    switch (message.type) {
+      case 'IMAGE':
+        return 'Sent an image';
+      case 'FILE':
+        return 'Sent a file';
+      case 'VOICE':
+        return 'Sent a voice message';
+      case 'POST_SHARE':
+        return 'Shared a post';
+      case 'SYSTEM': {
+        try {
+          const data = JSON.parse(message.content);
+          if (data?.kind === 'call') {
+            return data.status === 'missed' ? 'Missed call' : 'Call ended';
+          }
+        } catch {
+          /* fall through to raw content */
+        }
+        return message.content;
+      }
+      default: {
+        const text = message.content || '';
+        return text.length > 120 ? `${text.slice(0, 117)}...` : text;
+      }
+    }
   }
 
   /**
@@ -145,6 +192,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   emitMessagesRead(roomId: string, userId: string) {
     this.server.to(`room:${roomId}`).emit('messagesRead', { roomId, userId });
+  }
+
+  /**
+   * Notify everyone in a room that a message's reactions changed.
+   */
+  emitMessageReactionUpdated(roomId: string, message: ChatMessageDataType) {
+    this.server
+      .to(`room:${roomId}`)
+      .emit('chat:messageReactionUpdated', message);
+  }
+
+  /**
+   * Notify the two users involved in a block/unblock that their relationship
+   * changed, so each client can refresh the affected caches (chat composer
+   * banner, profile, feeds) in real time instead of waiting for a reload.
+   *
+   * Reuses the per-user personal rooms (`user:<id>`) that clients join through
+   * the global chat listener, so it reaches the target even when they are not
+   * currently viewing the conversation.
+   */
+  emitRelationshipChanged(payload: {
+    fromUserId: string;
+    toUserId: string;
+    isBlocked: boolean;
+  }) {
+    [payload.fromUserId, payload.toUserId].forEach((userId) => {
+      this.server
+        .to(`user:${userId}`)
+        .emit('chat:relationshipChanged', payload);
+    });
   }
 
   @UseGuards(WsJwtAuthGuard)

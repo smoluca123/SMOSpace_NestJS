@@ -23,6 +23,9 @@ import { S3Service } from 'src/services/aws/s3/s3.service';
 import { HttpExceptionFilter } from 'src/filters/http-exception.filter';
 import { ResponseInterceptor } from 'src/interceptors/response.interceptor';
 import { ChatModule } from 'src/resources/chat/chat.module';
+import { StoryModule } from 'src/resources/story/story.module';
+import { CallModule } from 'src/resources/call/call.module';
+import { PushModule } from 'src/resources/push/push.module';
 import { UserGatewayModule } from 'src/resources/gateways/user/user.module';
 import { LoggerModule } from 'src/libs/logger';
 import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
@@ -149,6 +152,9 @@ import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
     NotificationModule,
     S3Module,
     ChatModule,
+    StoryModule,
+    CallModule,
+    PushModule,
     LoggerModule,
   ],
   controllers: [AppController],
