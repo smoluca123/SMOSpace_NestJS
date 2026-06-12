@@ -48,8 +48,14 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 # Copy compiled application output
 COPY --from=builder /app/dist ./dist
 
+# Copy tsconfig files so tsconfig-paths can resolve baseUrl path aliases at runtime
+# This fixes "Cannot find module 'src/...'" errors caused by NestJS baseUrl imports
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/tsconfig.build.json ./tsconfig.build.json
+
 # Expose the application port (Northflank will map this)
 EXPOSE 3000
 
-# Start the application
-CMD ["bun", "run", "start:prod"]
+# Use tsconfig-paths/register to resolve TypeScript path aliases (e.g. src/configs/...)
+# that NestJS emits unresolved into compiled JS when using baseUrl
+CMD ["node", "-r", "tsconfig-paths/register", "dist/main"]
