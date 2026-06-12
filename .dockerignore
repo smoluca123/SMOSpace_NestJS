@@ -1,0 +1,43 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies (will be installed inside Docker)
+node_modules
+
+# Build output (will be generated inside Docker)
+dist
+build
+
+# Environment files (inject via Northflank environment variables)
+.env
+.env.*
+
+# Logs
+logs
+*.log
+
+# Test files
+test
+coverage
+.nyc_output
+
+# IDE / Editor configs
+.vscode
+.idea
+.cursor
+*.launch
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Temporary files
+.temp
+.tmp
+
+# Documentation
+README.md
+*.md
+postman
+db_exports
