@@ -1,6 +1,6 @@
 # ============================================================
 # Stage 1: Builder
-# Install all deps, generate Prisma client, and build app
+# Install all deps, generate Prisma client, build, and fix path aliases
 # ============================================================
 FROM oven/bun:1 AS builder
 
@@ -9,7 +9,7 @@ WORKDIR /app
 # Copy package manifests first to leverage Docker layer caching
 COPY package.json bun.lockb ./
 
-# Install ALL dependencies (devDeps required for build + tsconfig-paths at runtime)
+# Install ALL dependencies
 RUN bun install --frozen-lockfile
 
 # Copy Prisma schema before generating client
@@ -21,38 +21,34 @@ RUN bun prisma generate
 # Copy the rest of the source code
 COPY . .
 
-# Build the NestJS application
-RUN bun run build
+# Build the NestJS application, then run tsc-alias to rewrite path aliases.
+# tsc-alias converts non-relative imports like 'src/configs/configuration'
+# into proper relative paths inside dist/, eliminating runtime resolution issues.
+RUN bun run build && bunx tsc-alias -p tsconfig.json
 
 # ============================================================
 # Stage 2: Production runner
 # ============================================================
-FROM oven/bun:1-slim AS runner
+FROM node:20-slim AS runner
 
 WORKDIR /app
 
 # Set Node environment to production
 ENV NODE_ENV=production
 
-# Copy the entire node_modules from builder.
-# This includes devDependencies like tsconfig-paths which is required
-# at runtime to resolve NestJS baseUrl path aliases (e.g. 'src/configs/...')
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy Prisma schema and compiled application
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/dist ./dist
-
-# Copy tsconfig so tsconfig-paths/register can read path mappings at startup
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/tsconfig.build.json ./tsconfig.build.json
-
-# Copy package.json (needed by some packages to resolve their own paths)
+# Copy package manifests and install production dependencies only
 COPY package.json ./
+RUN npm install --omit=dev --ignore-scripts
+
+# Copy Prisma schema and generated client from builder
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# Copy compiled application (path aliases already resolved by tsc-alias)
+COPY --from=builder /app/dist ./dist
 
 # Expose the application port (Northflank will map this)
 EXPOSE 3000
 
-# Register tsconfig-paths at startup to resolve 'src/...' aliases in compiled JS
-CMD ["node", "-r", "tsconfig-paths/register", "dist/main"]
-
+# Run directly with node — no runtime path tricks needed
+CMD ["node", "dist/main"]
