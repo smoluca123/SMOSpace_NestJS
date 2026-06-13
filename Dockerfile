@@ -1,54 +1,43 @@
-# ============================================================
-# Stage 1: Builder
-# Install all deps, generate Prisma client, build, and fix path aliases
-# ============================================================
-FROM oven/bun:1 AS builder
+# Initiate a container to build the application in.
+FROM node:20-alpine AS builder
+ARG DATABASE_URL
+ENV NODE_ENV=build
+ENV DATABASE_URL=$DATABASE_URL
+WORKDIR /usr/src/app
 
-WORKDIR /app
+# Copy the package.json into the container.
+COPY package*.json ./
 
-# Copy package manifests first to leverage Docker layer caching
-COPY package.json bun.lockb ./
+# Install the dependencies required to build the application.
+RUN npm install --legacy-peer-deps
 
-# Install ALL dependencies
-RUN bun install --frozen-lockfile
-
-# Copy Prisma schema before generating client
-COPY prisma ./prisma
-
-# Generate Prisma client (must run before building the app)
-RUN bun prisma generate
-
-# Copy the rest of the source code
+# Copy the application source into the container.
 COPY . .
 
-# Build the NestJS application, then run tsc-alias to rewrite path aliases.
-# tsc-alias converts non-relative imports like 'src/configs/configuration'
-# into proper relative paths inside dist/, eliminating runtime resolution issues.
-RUN bun run build && bunx tsc-alias -p tsconfig.json
+# Generate Prisma client
+RUN npx prisma generate --schema=./prisma/schema
 
-# ============================================================
-# Stage 2: Production runner
-# ============================================================
-FROM node:20-slim AS runner
+# Build the application.
+RUN npm run build
 
-WORKDIR /app
+# Uninstall the dependencies not required to run the built application.
+RUN npm prune --production --force
 
-# Set Node environment to production
+# Initiate a new container to run the application in.
+FROM node:20-alpine
 ENV NODE_ENV=production
+WORKDIR /usr/src/app
 
-# Copy package manifests and install production dependencies only
-COPY package.json ./
-RUN npm install --omit=dev --ignore-scripts
+# Copy everything required to run the built application into the new container.
+COPY --from=builder /usr/src/app/package*.json ./
+COPY --from=builder /usr/src/app/node_modules/ ./node_modules/
+COPY --from=builder /usr/src/app/dist/ ./dist/
+COPY --from=builder /usr/src/app/prisma/ ./prisma/
+# Copy email templates (fallback if nest-cli.json assets config doesn't work)
+COPY --from=builder /usr/src/app/src/modules/mail/templates/ ./src/modules/mail/templates/
 
-# Copy Prisma schema and generated client from builder
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-
-# Copy compiled application (path aliases already resolved by tsc-alias)
-COPY --from=builder /app/dist ./dist
-
-# Expose the application port (Northflank will map this)
+# Expose the web server's port.
 EXPOSE 3000
 
-# Run directly with node — no runtime path tricks needed
+# Run the application.
 CMD ["node", "dist/main"]
