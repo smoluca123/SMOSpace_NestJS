@@ -8,8 +8,8 @@ WORKDIR /usr/src/app
 # Copy the package.json into the container.
 COPY package*.json ./
 
-# Install the dependencies required to build the application.
-RUN npm install --legacy-peer-deps
+# Install exact versions from package-lock.json to ensure consistency with local env
+RUN npm ci --legacy-peer-deps
 
 # Copy the application source into the container.
 COPY . .
