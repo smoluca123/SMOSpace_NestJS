@@ -1,9 +1,9 @@
+import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { EmailService } from './email.service';
-import { MailerModule } from '@nestjs-modules/mailer';
 import { RateLimiterModule } from 'src/common/services/rate-limiter.module';
 
 @Module({
