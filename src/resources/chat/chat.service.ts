@@ -1081,10 +1081,8 @@ export class ChatService {
       message: 'Room messages',
       data: {
         items: messages,
-        // Count ALL messages in the room (regardless of the `before` cursor) so
-        // the client can determine hasNextPage correctly when paginating upward.
         totalCount: await this.prisma.chatMessage.count({
-          where: { roomId },
+          where: whereQuery,
         }),
         currentPage: page,
         pageSize: limit,

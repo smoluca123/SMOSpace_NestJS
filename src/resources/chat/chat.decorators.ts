@@ -1,5 +1,5 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ApiQueryLimitAndPage } from 'src/decorators/pagination.decorators';
 import { JwtTokenVerifyGuard } from 'src/guards/jwt-token-verify.guard';
 
@@ -15,6 +15,10 @@ export const chatEndpointDecorator = (summary: string, description?: string) =>
       name: 'accessToken',
       description: 'Access token',
       required: true,
+    }),
+    ApiQuery({
+      name: 'before',
+      required: false,
     }),
     UseGuards(JwtTokenVerifyGuard),
   );
