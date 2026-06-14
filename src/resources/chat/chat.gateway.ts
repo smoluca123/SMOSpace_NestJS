@@ -138,25 +138,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const preview = this.buildPushPreview(message);
 
     (message.room?.participants || []).forEach((participant) => {
-      if (!participant.userId) return;
+      if (participant.userId && participant.userId !== senderId) {
+        this.server
+          .to(`user:${participant.userId}`)
+          .emit('chat:newMessageNotification', message);
 
-      // Notify every participant (including the sender) so their conversation
-      // list (lastMessage, order) stays up-to-date even when they are not
-      // currently viewing this room.
-      this.server
-        .to(`user:${participant.userId}`)
-        .emit('chat:newMessageNotification', message);
-
-      // Web Push only for OTHER participants who haven't muted the room.
-      if (participant.userId !== senderId && !participant.isMuted) {
-        void this.pushService
-          .sendToUser(participant.userId, {
-            title: senderName,
-            body: preview,
-            url: `/chat/${roomId}`,
-            tag: `chat-${roomId}`,
-          })
-          .catch(() => undefined);
+        // Web Push so muted-tab / closed-app users still get notified.
+        if (!participant.isMuted) {
+          void this.pushService
+            .sendToUser(participant.userId, {
+              title: senderName,
+              body: preview,
+              url: `/chat/${roomId}`,
+              tag: `chat-${roomId}`,
+            })
+            .catch(() => undefined);
+        }
       }
     });
   }
