@@ -195,6 +195,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
+   * Notify everyone in a room that a message was edited.
+   */
+  emitMessageUpdated(roomId: string, message: ChatMessageDataType) {
+    this.server.to(`room:${roomId}`).emit('chat:messageUpdated', message);
+  }
+
+  /**
+   * Notify everyone in a room that a message was deleted.
+   */
+  emitMessageDeleted(roomId: string, messageId: string) {
+    this.server.to(`room:${roomId}`).emit('chat:messageDeleted', { messageId });
+  }
+
+  /**
    * Notify everyone in a room that a message's reactions changed.
    */
   emitMessageReactionUpdated(roomId: string, message: ChatMessageDataType) {
@@ -298,11 +312,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data.user.id;
     await this.chatService.markMessagesAsRead(userId, data.messageIds);
 
-    // Notify other participants
-    this.server.to(`room:${data.roomId}`).emit('messagesRead', {
-      userId,
-      messageIds: data.messageIds,
-    });
+    // Broadcast using the shared helper so all code paths emit the same shape.
+    this.emitMessagesRead(data.roomId, userId);
 
     return { success: true };
   }
