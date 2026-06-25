@@ -1,12 +1,15 @@
 import { UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
+  OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { WsJwtGuard } from 'src/guards/ws-auth.guard';
 import { WsJwtVerifyGuard } from 'src/guards/ws-jwt-verify.guard';
 import { SocketWithUserAndDecodedAccessToken } from 'src/interfaces/interfaces.global';
@@ -20,13 +23,50 @@ import { PushService } from 'src/resources/push/push.service';
     origin: '*',
   },
 })
-export class NotificationGateway implements OnGatewayDisconnect {
+export class NotificationGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   private server: Server;
-  constructor(private readonly pushService: PushService) {}
 
-  handleDisconnect(client: Socket) {
-    if (client.data.user) {
+  constructor(
+    private readonly pushService: PushService,
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async handleConnection(client: SocketWithUserAndDecodedAccessToken) {
+    try {
+      const rawToken =
+        client.handshake.auth.accessToken ||
+        client.handshake.headers.accesstoken;
+
+      if (!rawToken) {
+        client.disconnect(true);
+        return;
+      }
+
+      const token = rawToken.replace('Bearer ', '');
+      const decoded = this.jwtService.verify(token);
+      const user = await this.prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { id: true, username: true, fullName: true },
+      });
+
+      if (!user) {
+        client.disconnect(true);
+        return;
+      }
+
+      (client.data as any).user = user;
+      (client.data as any).decodedToken = decoded;
+    } catch (error) {
+      client.disconnect(true);
+    }
+  }
+
+  handleDisconnect(client: SocketWithUserAndDecodedAccessToken) {
+    if (client.data?.user) {
       client.leave(`noti:to-${client.data.user.id}`);
     }
   }
@@ -36,7 +76,6 @@ export class NotificationGateway implements OnGatewayDisconnect {
   handleSubscribeNotification(
     @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
   ) {
-    console.log('subscribe notification');
     client.join(`noti:to-${client.data.user.id}`);
     client.send({
       status: 'success',

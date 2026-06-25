@@ -20,12 +20,14 @@ export class WsJwtVerifyGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client = context.switchToWs().getClient<Socket>();
     try {
+      const rawToken =
+        client.handshake.auth.accessToken ||
+        client.handshake.headers.accesstoken;
+
       // Build a mock request object to reuse the existing logic
       const mockRequest = {
         headers: {
-          accesstoken:
-            client.handshake.auth.accessToken ||
-            client.handshake.headers.accesstoken,
+          accesstoken: rawToken?.replace('Bearer ', ''),
         },
       };
 

@@ -30,14 +30,18 @@ export class CommentGateway
 {
   @WebSocketServer()
   private server: Server;
+  private socketRooms = new Map<string, Set<string>>();
+
   constructor(private readonly redisService: RedisService) {}
 
-  async handleConnection(client: Socket) {
-    console.log('Client connected comment:', client.id);
-  }
+  async handleConnection(client: Socket) {}
 
   async handleDisconnect(client: Socket) {
-    console.log('Client disconnected comment:', client.id);
+    const rooms = this.socketRooms.get(client.id);
+    if (rooms) {
+      rooms.forEach((room) => client.leave(room));
+      this.socketRooms.delete(client.id);
+    }
   }
 
   @SubscribeMessage('comment:subscribeOnNewComment')
@@ -47,8 +51,13 @@ export class CommentGateway
     @ConnectedSocket() client: Socket,
   ) {
     const { postId } = data;
-    console.log('subscribeOnNewComment', postId);
-    client.join(`subscribeOnNewComment:${postId}`);
+    const room = `subscribeOnNewComment:${postId}`;
+    client.join(room);
+
+    if (!this.socketRooms.has(client.id)) {
+      this.socketRooms.set(client.id, new Set());
+    }
+    this.socketRooms.get(client.id).add(room);
   }
 
   async emitNewComment(data: PostCommentDataType) {

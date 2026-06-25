@@ -27,9 +27,11 @@ export class WsAuthMiddleware {
 
   async use(socket: Socket, next: (err?: Error) => void) {
     try {
-      const token =
+      const rawToken =
         socket.handshake.auth.accessToken ||
         socket.handshake.headers.accesstoken;
+
+      const token = rawToken?.replace('Bearer ', '');
 
       if (!token) return next();
 
