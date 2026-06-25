@@ -4,12 +4,14 @@ import { OnModuleInit, UseGuards, UsePipes } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 
+import { JwtService } from '@nestjs/jwt';
 import { Redis } from 'ioredis';
 import { Server, Socket } from 'socket.io';
 import { WsJwtGuard } from 'src/guards/ws-auth.guard';
@@ -37,7 +39,9 @@ interface PresencePayload {
     origin: '*',
   },
 })
-export class UserGateway implements OnGatewayDisconnect, OnModuleInit {
+export class UserGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit
+{
   @WebSocketServer()
   private server: Server;
 
@@ -50,6 +54,7 @@ export class UserGateway implements OnGatewayDisconnect, OnModuleInit {
   constructor(
     private readonly redisService: RedisService,
     private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
   ) {
     this.redis = this.redisService.getOrThrow();
   }
@@ -57,6 +62,41 @@ export class UserGateway implements OnGatewayDisconnect, OnModuleInit {
   // Clear any stale presence left over from a previous (crashed) server run.
   async onModuleInit() {
     await this.redis.del(ONLINE_HASH_KEY);
+  }
+
+  async handleConnection(client: Socket) {
+    try {
+      const token =
+        client.handshake.auth?.token || client.handshake.headers?.authorization;
+
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+
+      const decoded = this.jwtService.verify(token, {
+        secret: process.env.ACCESS_TOKEN_SECRET,
+      });
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: decoded.sub },
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+        },
+      });
+
+      if (!user) {
+        client.disconnect();
+        return;
+      }
+
+      (client.data as any).user = user;
+      (client.data as any).decodedToken = decoded;
+    } catch (error) {
+      client.disconnect();
+    }
   }
 
   @UseGuards(WsJwtVerifyGuard)

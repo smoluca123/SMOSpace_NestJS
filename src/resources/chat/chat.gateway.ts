@@ -26,6 +26,7 @@ import {
 import { ZodValidationPipe } from 'src/pipes/zod.pipe';
 import { ChatMessageDataType } from 'src/libs/prisma-types';
 import { PushService } from 'src/resources/push/push.service';
+import { JwtService } from '@nestjs/jwt';
 
 @UseGuards(WsJwtGuard)
 @WebSocketGateway({
@@ -44,18 +45,69 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly chatService: ChatService,
     private prisma: PrismaService,
     private readonly pushService: PushService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  async handleConnection() {
+  async handleConnection(client: SocketWithUserAndDecodedAccessToken) {
     try {
-      console.log('Connected');
+      console.log('[chat:connection] START - client', client.id);
+
+      // Manual token verification (since @UseGuards doesn't work reliably on handleConnection)
+      const rawToken =
+        client.handshake.auth.accessToken ||
+        client.handshake.headers.accesstoken;
+
+      if (!rawToken) {
+        console.log('[chat:connection] No token provided');
+        client.disconnect(true);
+        return;
+      }
+
+      try {
+        const token = rawToken.replace('Bearer ', '');
+        const decoded = this.jwtService.verify(token);
+        const user = await this.prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: { id: true, username: true, fullName: true },
+        });
+
+        if (!user) {
+          console.log('[chat:connection] User not found for token');
+          client.disconnect(true);
+          return;
+        }
+
+        // Populate client.data for other handlers (cast to any to bypass strict typing)
+        (client.data as any).user = user;
+        (client.data as any).decodedToken = decoded;
+
+        const userRoom = `user:${user.id}`;
+        client.join(userRoom);
+        console.log(
+          '[chat:connection] SUCCESS - user',
+          user.id,
+          user.username,
+          'joined',
+          userRoom,
+        );
+      } catch (error) {
+        console.log(
+          '[chat:connection] Token verification failed:',
+          error.message,
+        );
+        client.disconnect(true);
+        return;
+      }
     } catch (error) {
-      console.log(error);
+      console.log('[chat:connection] error', error);
+      client.disconnect(true);
     }
   }
 
-  handleDisconnect() {
-    // Cleanup will be handled by the service
+  handleDisconnect(client: SocketWithUserAndDecodedAccessToken) {
+    if (client.data?.user?.id) {
+      client.leave(`user:${client.data.user.id}`);
+    }
   }
 
   // Each user joins a personal room so they can receive message notifications
@@ -66,7 +118,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
   ) {
     const userId = client.data.user.id;
-    client.join(`user:${userId}`);
+    const userRoom = `user:${userId}`;
+    client.join(userRoom);
     return { success: true };
   }
 
@@ -80,11 +133,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data.user.id;
     const { roomId } = data;
     const canJoin = await this.chatService.canUserJoinRoom(userId, roomId);
-    console.log(canJoin);
 
     if (canJoin) {
       client.join(`room:${roomId}`);
-      console.log('joined room', `room:${roomId}`);
       return { success: true };
     }
     return { success: false, message: 'Cannot join room' };
@@ -131,7 +182,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const roomId = message.room?.id;
     if (!roomId) return;
 
-    this.server.to(`room:${roomId}`).emit('newMessage', message);
+    const targets = [`room:${roomId}`];
+    (message.room?.participants || []).forEach((participant) => {
+      if (participant.userId) {
+        targets.push(`user:${participant.userId}`);
+      }
+    });
+
+    this.server.to(targets).emit('newMessage', message);
 
     const senderName =
       message.sender?.fullName || message.sender?.username || 'Someone';
@@ -143,7 +201,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           .to(`user:${participant.userId}`)
           .emit('chat:newMessageNotification', message);
 
-        // Web Push so muted-tab / closed-app users still get notified.
         if (!participant.isMuted) {
           void this.pushService
             .sendToUser(participant.userId, {
