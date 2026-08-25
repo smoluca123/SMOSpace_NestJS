@@ -237,18 +237,34 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.handshake.headers?.authorization;
 
       if (!rawToken) {
+        console.log(
+          '[call:connection] No token provided for client',
+          client.id,
+        );
         client.disconnect(true);
         return;
       }
 
       const token = rawToken.replace('Bearer ', '');
       const decoded = this.jwtService.verify(token);
+      const targetUserId = decoded.userId || decoded.sub || decoded.id;
+
+      if (!targetUserId) {
+        console.log(
+          '[call:connection] No userId in decoded token for client',
+          client.id,
+        );
+        client.disconnect(true);
+        return;
+      }
+
       const user = await this.prisma.user.findUnique({
-        where: { id: decoded.userId },
+        where: { id: targetUserId },
         select: userSelect,
       });
 
       if (!user) {
+        console.log('[call:connection] User not found for id', targetUserId);
         client.disconnect(true);
         return;
       }
@@ -259,7 +275,19 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const userRoom = `user:${user.id}`;
       client.join(userRoom);
       this.registerSocket(user.id, client.id);
-    } catch {
+      console.log(
+        '[call:connection] SUCCESS user',
+        user.id,
+        user.username,
+        'joined',
+        userRoom,
+      );
+    } catch (error) {
+      console.log(
+        '[call:connection] Verification error for client',
+        client.id,
+        error?.message,
+      );
       client.disconnect(true);
     }
   }
@@ -273,6 +301,15 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
       sockets.delete(client.id);
       if (sockets.size === 0) this.userSockets.delete(userId);
     }
+
+    console.log(
+      '[call:disconnect] user',
+      userId,
+      'socket',
+      client.id,
+      'remaining sockets:',
+      this.userSockets.get(userId)?.size ?? 0,
+    );
 
     // Only drop from the call when the user has no remaining connections.
     if (!this.isUserOnline(userId)) {
@@ -291,6 +328,7 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (userId) {
       client.join(`user:${userId}`);
       this.registerSocket(userId, client.id);
+      console.log('[call:subscribe] user', userId, 'subscribed');
     }
     return { success: true, iceServers: this.getIceServers() };
   }
@@ -304,6 +342,15 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const callerId = client.data.user.id;
     const { roomId, callType } = data;
+
+    console.log(
+      '[call:start] callerId:',
+      callerId,
+      'roomId:',
+      roomId,
+      'callType:',
+      callType,
+    );
 
     if (this.userCall.has(callerId)) {
       return { success: false, reason: 'busy' };
@@ -339,6 +386,15 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .map((p) => p.user)
       .filter((u) => u.id !== callerId);
 
+    console.log(
+      '[call:start] others in room:',
+      others.map((u) => ({
+        id: u.id,
+        name: u.username,
+        online: this.isUserOnline(u.id),
+      })),
+    );
+
     // Resolve who can actually be invited: online, not busy, not blocked.
     const invitees: CallPeer[] = [];
     for (const u of others) {
@@ -348,6 +404,11 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (await this.isBlockedBetween(callerId, u.id)) continue;
       invitees.push(u);
     }
+
+    console.log(
+      '[call:start] resolved invitees:',
+      invitees.map((u) => u.id),
+    );
 
     if (invitees.length === 0) {
       client.emit('call:unavailable', { roomId });
@@ -373,6 +434,7 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.userCall.set(callerId, callId);
 
     invitees.forEach((u) => {
+      console.log('[call:start] Emitting call:incoming to user:' + u.id);
       this.emitToUser(u.id, 'call:incoming', {
         callId,
         roomId,
