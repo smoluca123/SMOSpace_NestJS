@@ -99,6 +99,9 @@ export class NotificationService {
         data,
         select: notificationDataSelect,
       });
+      if (shouldEmit) {
+        this.notificationGateway.emitNewNotification(updated);
+      }
       return updated;
     }
 

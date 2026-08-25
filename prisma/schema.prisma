@@ -278,7 +278,8 @@ model PostLike {
   user User @relation(fields: [userId], references: [id])
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  // @@unique([userId, postId])
+  // Unique constraint to prevent duplicate likes from the same user
+  @@unique([userId, postId])
   @@index([userId, postId])
   @@index([postId, type])
   @@map("post_likes")
@@ -356,6 +357,8 @@ model PostCommentLike {
   user    User        @relation(fields: [userId], references: [id])
   comment PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
+  // Unique constraint to prevent duplicate comment likes from the same user
+  @@unique([userId, commentId])
   @@index([userId, commentId])
   @@index([commentId, type])
   @@map("post_comment_likes")
@@ -514,7 +517,7 @@ model ChatRoom {
   status    ChatRoomStatus @default(PENDING) @map("status")
 
   lastMessageId String?      @unique @map("last_message_id")
-  lastMessage   ChatMessage? @relation("LastMessage", fields: [lastMessageId], references: [id])
+  lastMessage   ChatMessage? @relation("LastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
 
   // Participants in the chat room
   participants ChatParticipant[]

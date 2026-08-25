@@ -38,8 +38,10 @@ export class NotificationGateway
   async handleConnection(client: SocketWithUserAndDecodedAccessToken) {
     try {
       const rawToken =
-        client.handshake.auth.accessToken ||
-        client.handshake.headers.accesstoken;
+        client.handshake.auth?.accessToken ||
+        client.handshake.auth?.token ||
+        client.handshake.headers?.accesstoken ||
+        client.handshake.headers?.authorization;
 
       if (!rawToken) {
         client.disconnect(true);
@@ -60,13 +62,17 @@ export class NotificationGateway
 
       (client.data as any).user = user;
       (client.data as any).decodedToken = decoded;
+
+      // Automatically join user's notification room immediately upon connection
+      const userRoom = `noti:to-${user.id}`;
+      client.join(userRoom);
     } catch (error) {
       client.disconnect(true);
     }
   }
 
   handleDisconnect(client: SocketWithUserAndDecodedAccessToken) {
-    if (client.data?.user) {
+    if (client.data?.user?.id) {
       client.leave(`noti:to-${client.data.user.id}`);
     }
   }
@@ -76,15 +82,20 @@ export class NotificationGateway
   handleSubscribeNotification(
     @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
   ) {
-    client.join(`noti:to-${client.data.user.id}`);
-    client.send({
+    if (client.data?.user?.id) {
+      client.join(`noti:to-${client.data.user.id}`);
+    }
+    return {
       status: 'success',
       message: 'You are subscribed to notification',
-    });
+    };
   }
 
   async emitNewNotification(data: NotificationDataType) {
-    this.server.to(`noti:to-${data.recipientId}`).emit('noti:new', data);
+    if (!data?.recipientId) return;
+
+    const userRoom = `noti:to-${data.recipientId}`;
+    this.server?.to(userRoom).emit('noti:new', data);
 
     // Also deliver via Web Push so the user is reached even when offline / the
     // tab is closed. Best-effort: never let push failures affect the socket path.
