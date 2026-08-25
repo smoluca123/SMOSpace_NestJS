@@ -77,7 +77,6 @@ const MAX_PARTICIPANTS = 3;
  * tracks who is in a call session and relays SDP/ICE between peers. To avoid
  * offer "glare", only users already in the session send offers to a newcomer.
  */
-@UseGuards(WsJwtGuard)
 @WebSocketGateway({
   namespace: 'call',
   cors: { origin: '*' },

@@ -12,12 +12,18 @@ export class WsJwtGuard extends AuthGuard('jwt') {
     // Build a fake request object so the JWT strategy can process it.
     // Prefer the explicit accessToken auth field sent by the client; fall
     // back to the Authorization header only if absent.
-    const accessToken =
-      client.handshake.auth.accessToken || client.handshake.headers.accesstoken;
+    const rawToken =
+      client.handshake.auth?.accessToken ||
+      client.handshake.auth?.token ||
+      client.handshake.headers?.accesstoken ||
+      client.handshake.headers?.authorization;
+
+    const token = rawToken?.replace('Bearer ', '');
 
     return {
       headers: {
-        accesstoken: accessToken,
+        authorization: token ? `Bearer ${token}` : undefined,
+        accesstoken: token,
       },
     };
   }
