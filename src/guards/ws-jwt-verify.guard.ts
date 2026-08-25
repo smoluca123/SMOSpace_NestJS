@@ -20,14 +20,25 @@ export class WsJwtVerifyGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client = context.switchToWs().getClient<Socket>();
     try {
+      // If user data is already populated in handleConnection, allow immediately
+      if (client.data?.user?.id) {
+        return true;
+      }
+
       const rawToken =
-        client.handshake.auth.accessToken ||
-        client.handshake.headers.accesstoken;
+        client.handshake.auth?.accessToken ||
+        client.handshake.auth?.token ||
+        client.handshake.headers?.accesstoken ||
+        client.handshake.headers?.authorization;
+
+      if (!rawToken) {
+        throw new WsException('Unauthorized');
+      }
 
       // Build a mock request object to reuse the existing logic
       const mockRequest = {
         headers: {
-          accesstoken: rawToken?.replace('Bearer ', ''),
+          accesstoken: rawToken.replace('Bearer ', ''),
         },
       };
 

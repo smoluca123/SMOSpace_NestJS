@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/websockets';
 import { randomUUID } from 'crypto';
 import { Server } from 'socket.io';
+import { JwtService } from '@nestjs/jwt';
 import { FriendStatus, MessageType } from '@prisma/client';
 import { WsJwtGuard } from 'src/guards/ws-auth.guard';
 import { WsJwtVerifyGuard } from 'src/guards/ws-jwt-verify.guard';
@@ -80,7 +82,7 @@ const MAX_PARTICIPANTS = 3;
   namespace: 'call',
   cors: { origin: '*' },
 })
-export class CallGateway implements OnGatewayDisconnect {
+export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   private server: Server;
 
@@ -96,6 +98,7 @@ export class CallGateway implements OnGatewayDisconnect {
     private readonly configService: ConfigService,
     private readonly chatService: ChatService,
     private readonly chatGateway: ChatGateway,
+    private readonly jwtService: JwtService,
   ) {}
 
   /**
@@ -225,6 +228,42 @@ export class CallGateway implements OnGatewayDisconnect {
     }
   }
 
+  async handleConnection(client: SocketWithUserAndDecodedAccessToken) {
+    try {
+      const rawToken =
+        client.handshake.auth?.accessToken ||
+        client.handshake.auth?.token ||
+        client.handshake.headers?.accesstoken ||
+        client.handshake.headers?.authorization;
+
+      if (!rawToken) {
+        client.disconnect(true);
+        return;
+      }
+
+      const token = rawToken.replace('Bearer ', '');
+      const decoded = this.jwtService.verify(token);
+      const user = await this.prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: userSelect,
+      });
+
+      if (!user) {
+        client.disconnect(true);
+        return;
+      }
+
+      (client.data as any).user = user;
+      (client.data as any).decodedToken = decoded;
+
+      const userRoom = `user:${user.id}`;
+      client.join(userRoom);
+      this.registerSocket(user.id, client.id);
+    } catch {
+      client.disconnect(true);
+    }
+  }
+
   handleDisconnect(client: SocketWithUserAndDecodedAccessToken) {
     const userId = client.data?.user?.id as string | undefined;
     if (!userId) return;
@@ -248,9 +287,11 @@ export class CallGateway implements OnGatewayDisconnect {
   handleSubscribe(
     @ConnectedSocket() client: SocketWithUserAndDecodedAccessToken,
   ) {
-    const userId = client.data.user.id;
-    client.join(`user:${userId}`);
-    this.registerSocket(userId, client.id);
+    const userId = client.data?.user?.id;
+    if (userId) {
+      client.join(`user:${userId}`);
+      this.registerSocket(userId, client.id);
+    }
     return { success: true, iceServers: this.getIceServers() };
   }
 
